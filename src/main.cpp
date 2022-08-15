@@ -110,7 +110,8 @@ public:
         return _terminals.at(index);
     }
 
-    virtual void step() = 0;
+    virtual void stepCurrent() = 0;
+    virtual void stepVoltage() = 0;
 
     virtual void beginFrame() = 0;
 };
@@ -119,24 +120,42 @@ struct Ground : public Component {
     Ground()
         : Component{1} {}
 
-    void step() override {
+    void stepCurrent() override {
+        // Todo: Implement
+    }
+
+    void stepVoltage() override {
         terminal(0).voltage(0);
     }
 
     void beginFrame() override {}
 };
 
-struct Battery : public Component {
+class Battery : public Component {
     double _stepCurrent = 0;
+    double _voltage = 0;
 
+public:
     Battery()
         : Component{2} {}
+
+    double voltage(double v) {
+        return _voltage = v;
+    }
 
     void beginFrame() override {
         _stepCurrent = 0;
     }
 
-    void step() override {
+    void stepVoltage() override {
+        double meanVoltage =
+            (terminal(0).node()->voltage() + terminal(1).node()->voltage()) / 2;
+
+        terminal(0).voltage(meanVoltage + _voltage / 2.);
+        terminal(1).voltage(meanVoltage - _voltage / 2.);
+    }
+
+    void stepCurrent() override {
         double _current = 0;
 
         _current =
@@ -152,7 +171,7 @@ struct Battery : public Component {
 class Log {
     std::vector<double> _data;
     size_t _frames = 0;
-    static std::vector<class Probe *> _probes;
+    static std::vector<class VoltageProbe *> _probes;
 
 public:
     void step() {
@@ -167,7 +186,7 @@ public:
         _data.at(_frames * _probes.size() + probeIndex) = value;
     }
 
-    size_t registerProbe(Probe *probe) {
+    size_t registerProbe(VoltageProbe *probe) {
         _probes.push_back(probe);
         return _probes.size() - 1;
     }
@@ -178,7 +197,7 @@ public:
 
             for (size_t j = 0; j < _probes.size(); ++j) {
 
-                std::cout << _data.at(i * _probes.size() + j);
+                std::cout << _data.at(i * _probes.size() + j) << " ";
             }
 
             std::cout << "\n";
@@ -186,21 +205,23 @@ public:
     }
 };
 
-std::vector<class Probe *> Log::_probes;
+std::vector<class VoltageProbe *> Log::_probes;
 
 Log probeLog;
 
-class Probe : public Component {
+class VoltageProbe : public Component {
     size_t index;
 
 public:
-    Probe()
+    VoltageProbe()
         : Component{1} {
         terminal(0).enabled(false);
         index = probeLog.registerProbe(this);
     }
 
-    void step() override {
+    void stepCurrent() override {}
+
+    void stepVoltage() override {
         probeLog.log(index, terminal(0).node()->voltage());
     }
 
@@ -235,15 +256,24 @@ public:
     }
 
     template <typename T, typename... Args>
-    Component *create(Args... args, std::vector<size_t> connections) {
-        return add(std::make_unique<T>(args...), connections);
+    T *create(Args... args, std::vector<size_t> connections) {
+        add(std::make_unique<T>(args...), connections);
+        return static_cast<T *>(_components.back().get());
     }
 
     void step() {
         probeLog.step();
 
         for (auto &c : _components) {
-            c->step();
+            c->stepCurrent();
+        }
+
+        for (auto &c : _components) {
+            c->stepVoltage();
+        }
+
+        for (auto &n : _nodes) {
+            n->step();
         }
     }
 };
@@ -253,14 +283,18 @@ int main(int argc, char *argv[]) {
 
     auto circuit = Circuit{};
 
-    circuit.create<Probe>({0});
+    circuit.create<VoltageProbe>({0});
+    circuit.create<VoltageProbe>({1});
+    circuit.create<Ground>({0});
+    circuit.create<Battery>({1, 0})->voltage(1.5);
 
-    circuit.step();
-    circuit.step();
-    circuit.step();
-    circuit.step();
+    for (size_t i = 0; i < 100; ++i) {
+        circuit.step();
+    }
 
     probeLog.print();
+
+    std::cout.flush();
 
     return 0;
 }
