@@ -207,30 +207,13 @@ public:
         auto error = currentVoltage - _voltage;
 
         // TODO: Check sign
-        terminal(0).incVoltage(-error);
-        terminal(1).incVoltage(error);
+        terminal(1).incVoltage(-error);
+        terminal(0).incVoltage(error);
     }
 
-    // void stepVoltage() override {
-    //     double meanVoltage =
-    //         (terminal(0).node()->voltage() + terminal(1).node()->voltage()) /
-    //         2;
-
-    //     terminal(0).voltage(meanVoltage + _voltage / 2.);
-    //     terminal(1).voltage(meanVoltage - _voltage / 2.);
-    // }
-
-    // void stepCurrent() override {
-    //     double _current = 0;
-
-    //     _current = terminal(0).node()->currentError() -
-    //                terminal(1).node()->currentError();
-
-    //     _stepCurrent = lerp(_current, _stepCurrent, learningRate);
-
-    //     terminal(0).current(-_stepCurrent);
-    //     terminal(1).current(_stepCurrent);
-    // }
+    void current(size_t i) {
+        // return
+    }
 };
 
 class Resistor : public Component {
