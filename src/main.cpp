@@ -1,4 +1,5 @@
 #include <iostream>
+#include <iterator>
 #include <memory>
 #include <vector>
 
@@ -8,29 +9,30 @@ double lerp(double a, double b, double t) {
     return a * (1. - t) + b * t;
 }
 
+double correction(double value, double expection, double step) {
+    auto error = expection - value;
+    return error * step;
+}
+
 class Steppable {
     virtual void step(double stepSize) = 0;
 };
 
-// class ComponentWithCurrent {
-//     virtual double current(class Terminal& terminal) {
-
-//     }
-// };
-
 // Terminal connected to a component
 class Terminal {
+private:
     double _voltage;
-    // double _current;
 
     bool _enabled = true;
-    struct Node *_node = nullptr;
+    class Node *_node = nullptr;
+    class Component *_parent = nullptr;
     double _direction = 1;
 
 public:
     Terminal(const Terminal &) = default;
-    Terminal(double direction)
-        : _direction{direction} {}
+    Terminal(Component *parent, double direction)
+        : _parent{parent}
+        , _direction{direction} {}
 
     constexpr bool enabled() const {
         return _enabled;
@@ -41,14 +43,10 @@ public:
     }
 
     constexpr double voltage() const;
+    constexpr void incVoltage(double v) const;
 
-    // constexpr double current() const {
-    //     return _current;
-    // }
-
-    // constexpr double current(double c) {
-    //     return _current = c;
-    // }
+    double current() const;
+    void incCurrent(double v);
 
     constexpr const Node *node() const {
         if (!_node) {
@@ -56,8 +54,6 @@ public:
         }
         return _node;
     }
-
-    constexpr void incVoltage(double v) const;
 
     constexpr const Node *node(Node *node) {
         return _node = node;
@@ -70,13 +66,13 @@ public:
 
 // Connection between terminals
 class Node : Steppable {
-    std::vector<const Terminal *> _connectedTerminals;
+    std::vector<Terminal *> _connectedTerminals;
     double _voltage = 0;
-    // double _currentError = 0;
 
 public:
     Node(const Node &) = delete;
     Node() = default;
+    virtual ~Node() = default;
 
     void addTerminal(Terminal *t) {
         _connectedTerminals.push_back(t);
@@ -84,19 +80,17 @@ public:
     }
 
     void step(double stepSize) override {
+        double sumCurrent = 0;
         for (auto c : _connectedTerminals) {
+            sumCurrent += c->current();
         }
 
-        // size_t sum = 0;
-        // double v = 0;
-        // for (auto c : _connections) {
-        //     if (c->enabled()) {
-        //         ++sum;
-        //         v += c->voltage();
-        //         _currentError += c->current();
-        //     }
-        // }
-        // _voltage = v / sum;
+        auto correction = sumCurrent / _connectedTerminals.size();
+
+        // The sum current is expected to be be 0, Kirchhoffs law
+        for (auto c : _connectedTerminals) {
+            c->incCurrent(-correction * stepSize);
+        }
     }
 
     constexpr double voltage() const {
@@ -110,39 +104,37 @@ public:
     constexpr double voltage(double v) {
         return _voltage = v;
     }
-
-    /// Residual currentError, should always be near zero when circuit is
-    /// balanced at the end of each simulation step
-    // constexpr double currentError() const {
-    //     return _currentError;
-    // }
 };
-
-constexpr double Terminal::voltage() const {
-    return _node->voltage();
-}
-
-constexpr void Terminal::incVoltage(double v) const {
-    return _node->incVoltage(v * _direction);
-}
 
 class Component : public Steppable {
     std::vector<Terminal> _terminals;
 
 public:
+    double current(const Terminal &terminal) const {
+        auto index = std::distance(_terminals.data(), &terminal);
+        return current(index);
+    }
+    void incCurrent(Terminal &terminal) {
+        auto index = std::distance(_terminals.data(), &terminal);
+        return incCurrent(index);
+    }
+
+    virtual double current(size_t) const = 0;
+    virtual void incCurrent(size_t) = 0;
+
     Component(const Component &) = delete;
     virtual ~Component() = default;
 
     Component(size_t numTerminals) {
         if (numTerminals == 0) {
             _terminals = {
-                {1},
+                {this, 1},
             };
         }
         else {
             _terminals = {
-                {1},
-                {-1},
+                {this, 1},
+                {this, -1},
             };
         }
     }
@@ -163,26 +155,33 @@ public:
                2;
     }
 
-    // virtual void step(double stepSize) = 0;
-    // virtual void stepCurrent() = 0;
-    // virtual void stepVoltage() = 0;
-
     virtual void beginFrame() = 0;
 };
+
+constexpr double Terminal::voltage() const {
+    return _node->voltage();
+}
+
+constexpr void Terminal::incVoltage(double v) const {
+    return _node->incVoltage(v);
+}
+
+double Terminal::current() const {
+    return _parent->current(*this);
+}
+
+void Terminal::incCurrent(double v) {
+    return _parent->incCurrent(*this);
+}
 
 struct Ground : public Component {
     Ground()
         : Component{1} {}
 
-    // void stepCurrent() override {
-    //     // Todo: Implement
-    // }
-
-    // void stepVoltage() override {
-    //     terminal(0).voltage(0);
-    // }
-
-    void step(double stepSize) {}
+    void step(double stepSize) override {
+        // Todo: Make ground pin the voltage of terminal directly to ground
+        terminal(0).incVoltage(-terminal(1).voltage() * stepSize);
+    }
 
     void beginFrame() override {}
 };
@@ -235,7 +234,7 @@ public:
 };
 
 class Resistor : public Component {
-    double _resistance = 1;
+    double _resistance = 1; // Constant
 
     double _stepCurrent = 0;
 
@@ -246,6 +245,25 @@ public:
     Resistor(const Resistor &) = delete;
 
     void beginFrame() override {}
+
+    void step(double stepSize) override {
+        auto voltageDrop = terminal(1).voltage() - terminal(0).voltage();
+        {
+            // Correct current part
+            auto expectedCurrent = voltageDrop / _resistance;
+            auto c = correction(_stepCurrent, expectedCurrent, stepSize);
+            _stepCurrent += c;
+        }
+
+        {
+            // Correct voltage part
+            auto expectedVoltageDrop = _stepCurrent * _resistance;
+            auto c = correction(voltageDrop, expectedVoltageDrop, stepSize);
+
+            terminal(0).incVoltage(-c / 2.);
+            terminal(1).incVoltage(c / 2.);
+        }
+    }
 
     // void stepVoltage() override {
     //     auto mv = meanNodeVoltage();
@@ -312,13 +330,13 @@ std::vector<class VoltageProbe *> Log::_probes;
 Log probeLog;
 
 class VoltageProbe : public Component {
-    size_t index;
+    size_t index = 0;
 
 public:
     VoltageProbe()
-        : Component{1} {
+        : Component{1}
+        , index{probeLog.registerProbe(this)} {
         terminal(0).enabled(false);
-        index = probeLog.registerProbe(this);
     }
 
     // void stepCurrent() override {}
@@ -326,6 +344,8 @@ public:
     // void stepVoltage() override {
     //     probeLog.log(index, terminal(0).node()->voltage());
     // }
+
+    void step(double stepSize) override {}
 
     void beginFrame() override {}
 };
@@ -379,15 +399,17 @@ int main(int argc, char *argv[]) {
 
     // Possible future ascii-art syntax
     // Without the numbers
-    //  ·0----·1--P1
-    //  |     |
-    //  |     R1
-    //  B     ·2--P2
-    //  |     R2
-    //  |     |
-    //  ·-----·3--P3
-    //        |
-    //        G
+    std::cout << R"_(
+      ·0----·1--P1
+      |     |
+      |     R1
+      B     ·2--P2
+      |     R2
+      |     |
+      ·-----·3--P3
+            |
+            G
+)_";
 
     circuit.create<Battery>({0, 3})->voltage(1.5);
     circuit.create<Resistor>({1, 2})->resistance(1000);
