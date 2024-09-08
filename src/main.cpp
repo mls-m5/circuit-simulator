@@ -8,17 +8,29 @@ double lerp(double a, double b, double t) {
     return a * (1. - t) + b * t;
 }
 
+class Steppable {
+    virtual void step(double stepSize) = 0;
+};
+
+// class ComponentWithCurrent {
+//     virtual double current(class Terminal& terminal) {
+
+//     }
+// };
+
 // Terminal connected to a component
 class Terminal {
     double _voltage;
-    double _current;
+    // double _current;
 
     bool _enabled = true;
-    const struct Node *_node = nullptr;
+    struct Node *_node = nullptr;
+    double _direction = 1;
 
 public:
     Terminal(const Terminal &) = default;
-    Terminal() = default;
+    Terminal(double direction)
+        : _direction{direction} {}
 
     constexpr bool enabled() const {
         return _enabled;
@@ -28,21 +40,15 @@ public:
         return _enabled = e;
     }
 
-    constexpr double voltage() const {
-        return _voltage;
-    }
+    constexpr double voltage() const;
 
-    constexpr double voltage(double v) {
-        return _voltage = v;
-    }
+    // constexpr double current() const {
+    //     return _current;
+    // }
 
-    constexpr double current() const {
-        return _current;
-    }
-
-    constexpr double current(double c) {
-        return _current = c;
-    }
+    // constexpr double current(double c) {
+    //     return _current = c;
+    // }
 
     constexpr const Node *node() const {
         if (!_node) {
@@ -51,51 +57,76 @@ public:
         return _node;
     }
 
+    constexpr void incVoltage(double v) const;
+
     constexpr const Node *node(Node *node) {
         return _node = node;
+    }
+
+    constexpr Node *node() {
+        return _node;
     }
 };
 
 // Connection between terminals
-class Node {
-    std::vector<const Terminal *> _connections;
+class Node : Steppable {
+    std::vector<const Terminal *> _connectedTerminals;
     double _voltage = 0;
-    double _current = 0;
+    // double _currentError = 0;
 
 public:
     Node(const Node &) = delete;
     Node() = default;
 
     void addTerminal(Terminal *t) {
-        _connections.push_back(t);
+        _connectedTerminals.push_back(t);
         t->node(this);
     }
 
-    void step() {
-        size_t sum = 0;
-        double v = 0;
-        for (auto c : _connections) {
-            if (c->enabled()) {
-                ++sum;
-                v += c->voltage();
-                _current += c->current();
-            }
+    void step(double stepSize) override {
+        for (auto c : _connectedTerminals) {
         }
-        _voltage = v / sum;
+
+        // size_t sum = 0;
+        // double v = 0;
+        // for (auto c : _connections) {
+        //     if (c->enabled()) {
+        //         ++sum;
+        //         v += c->voltage();
+        //         _currentError += c->current();
+        //     }
+        // }
+        // _voltage = v / sum;
     }
 
     constexpr double voltage() const {
         return _voltage;
     }
 
-    /// Residual current, should always be near zero when circuit is balanced at
-    /// the end of each simulation step
-    constexpr double current() const {
-        return _current;
+    constexpr void incVoltage(double value) {
+        _voltage += value;
     }
+
+    constexpr double voltage(double v) {
+        return _voltage = v;
+    }
+
+    /// Residual currentError, should always be near zero when circuit is
+    /// balanced at the end of each simulation step
+    // constexpr double currentError() const {
+    //     return _currentError;
+    // }
 };
 
-class Component {
+constexpr double Terminal::voltage() const {
+    return _node->voltage();
+}
+
+constexpr void Terminal::incVoltage(double v) const {
+    return _node->incVoltage(v * _direction);
+}
+
+class Component : public Steppable {
     std::vector<Terminal> _terminals;
 
 public:
@@ -103,15 +134,38 @@ public:
     virtual ~Component() = default;
 
     Component(size_t numTerminals) {
-        _terminals.resize(numTerminals);
+        if (numTerminals == 0) {
+            _terminals = {
+                {1},
+            };
+        }
+        else {
+            _terminals = {
+                {1},
+                {-1},
+            };
+        }
     }
 
     Terminal &terminal(size_t index) {
         return _terminals.at(index);
     }
 
-    virtual void stepCurrent() = 0;
-    virtual void stepVoltage() = 0;
+    // Return mean voltage between two terminals
+    double meanNodeVoltage() {
+        if (_terminals.size() != 2) {
+            throw std::runtime_error{
+                "trying to run meanVoltage() that does not have two terminals"};
+        }
+
+        return (_terminals.front().node()->voltage() +
+                _terminals.back().node()->voltage()) /
+               2;
+    }
+
+    // virtual void step(double stepSize) = 0;
+    // virtual void stepCurrent() = 0;
+    // virtual void stepVoltage() = 0;
 
     virtual void beginFrame() = 0;
 };
@@ -120,13 +174,15 @@ struct Ground : public Component {
     Ground()
         : Component{1} {}
 
-    void stepCurrent() override {
-        // Todo: Implement
-    }
+    // void stepCurrent() override {
+    //     // Todo: Implement
+    // }
 
-    void stepVoltage() override {
-        terminal(0).voltage(0);
-    }
+    // void stepVoltage() override {
+    //     terminal(0).voltage(0);
+    // }
+
+    void step(double stepSize) {}
 
     void beginFrame() override {}
 };
@@ -147,34 +203,80 @@ public:
         _stepCurrent = 0;
     }
 
-    void stepVoltage() override {
-        double meanVoltage =
-            (terminal(0).node()->voltage() + terminal(1).node()->voltage()) / 2;
+    void step(double stepSize) override {
+        auto currentVoltage = terminal(1).voltage() - terminal(0).voltage();
+        auto error = currentVoltage - _voltage;
 
-        terminal(0).voltage(meanVoltage + _voltage / 2.);
-        terminal(1).voltage(meanVoltage - _voltage / 2.);
+        // TODO: Check sign
+        terminal(0).incVoltage(-error);
+        terminal(1).incVoltage(error);
     }
 
-    void stepCurrent() override {
-        double _current = 0;
+    // void stepVoltage() override {
+    //     double meanVoltage =
+    //         (terminal(0).node()->voltage() + terminal(1).node()->voltage()) /
+    //         2;
 
-        _current =
-            terminal(0).node()->current() - terminal(1).node()->current();
+    //     terminal(0).voltage(meanVoltage + _voltage / 2.);
+    //     terminal(1).voltage(meanVoltage - _voltage / 2.);
+    // }
 
-        _stepCurrent = lerp(_current, _stepCurrent, learningRate);
+    // void stepCurrent() override {
+    //     double _current = 0;
 
-        terminal(0).current(-_stepCurrent);
-        terminal(1).current(_stepCurrent);
+    //     _current = terminal(0).node()->currentError() -
+    //                terminal(1).node()->currentError();
+
+    //     _stepCurrent = lerp(_current, _stepCurrent, learningRate);
+
+    //     terminal(0).current(-_stepCurrent);
+    //     terminal(1).current(_stepCurrent);
+    // }
+};
+
+class Resistor : public Component {
+    double _resistance = 1;
+
+    double _stepCurrent = 0;
+
+public:
+    Resistor()
+        : Component{2} {}
+
+    Resistor(const Resistor &) = delete;
+
+    void beginFrame() override {}
+
+    // void stepVoltage() override {
+    //     auto mv = meanNodeVoltage();
+    //     terminal(0).voltage(mv - _stepCurrent * _resistance);
+    //     terminal(1).voltage(mv + _stepCurrent * _resistance);
+    // }
+
+    // void stepCurrent() override {
+    //     auto voltageDrop =
+    //         terminal(1).node()->voltage() - terminal(0).node()->voltage();
+    //     auto current = voltageDrop / _resistance;
+    //     _stepCurrent = lerp(current, _stepCurrent, learningRate);
+    //     terminal(0).current(_stepCurrent);
+    //     terminal(1).current(-_stepCurrent);
+    // }
+
+    double resistance(double value) {
+        if (!value) {
+            throw std::runtime_error{"resistance cannot be zero for resistor"};
+        }
+        return _resistance = value;
     }
 };
 
-class Log {
+class Log : public Steppable {
     std::vector<double> _data;
     size_t _frames = 0;
     static std::vector<class VoltageProbe *> _probes;
 
 public:
-    void step() {
+    void step(double stepSize) override {
         ++_frames;
         auto required = (_frames + 1) * _probes.size();
         if (required > _data.size()) {
@@ -219,11 +321,11 @@ public:
         index = probeLog.registerProbe(this);
     }
 
-    void stepCurrent() override {}
+    // void stepCurrent() override {}
 
-    void stepVoltage() override {
-        probeLog.log(index, terminal(0).node()->voltage());
-    }
+    // void stepVoltage() override {
+    //     probeLog.log(index, terminal(0).node()->voltage());
+    // }
 
     void beginFrame() override {}
 };
@@ -261,19 +363,11 @@ public:
         return static_cast<T *>(_components.back().get());
     }
 
-    void step() {
-        probeLog.step();
-
-        for (auto &c : _components) {
-            c->stepCurrent();
-        }
-
-        for (auto &c : _components) {
-            c->stepVoltage();
-        }
+    void step(double stepSize) {
+        probeLog.step(stepSize);
 
         for (auto &n : _nodes) {
-            n->step();
+            n->step(stepSize);
         }
     }
 };
@@ -283,13 +377,29 @@ int main(int argc, char *argv[]) {
 
     auto circuit = Circuit{};
 
-    circuit.create<VoltageProbe>({0});
+    // Possible future ascii-art syntax
+    // Without the numbers
+    //  ·0----·1--P1
+    //  |     |
+    //  |     R1
+    //  B     ·2--P2
+    //  |     R2
+    //  |     |
+    //  ·-----·3--P3
+    //        |
+    //        G
+
+    circuit.create<Battery>({0, 3})->voltage(1.5);
+    circuit.create<Resistor>({1, 2})->resistance(1000);
+    circuit.create<Resistor>({2, 3})->resistance(1000);
     circuit.create<VoltageProbe>({1});
-    circuit.create<Ground>({0});
-    circuit.create<Battery>({1, 0})->voltage(1.5);
+    circuit.create<VoltageProbe>({2});
+    circuit.create<Ground>({3});
+
+    auto stepSize = 0.001;
 
     for (size_t i = 0; i < 100; ++i) {
-        circuit.step();
+        circuit.step(stepSize);
     }
 
     probeLog.print();
