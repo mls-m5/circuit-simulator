@@ -1,6 +1,7 @@
+#include "circuit.h"
+#include "components.h"
 #include "log.h"
 #include "mls-unit-test/unittest.h"
-#include "simulator.h"
 
 constexpr auto e = 0.0001;
 

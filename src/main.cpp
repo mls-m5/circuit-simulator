@@ -1,5 +1,5 @@
 
-#include "simulator.h"
+#include "components.h"
 
 int main(int, char **) {
 
