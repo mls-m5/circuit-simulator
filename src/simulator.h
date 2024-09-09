@@ -24,8 +24,6 @@ CorrectionResult correction(double value, double expection, double step) {
     res.error = expection - value;
     res.correction = res.error * step;
     return res;
-    // auto error = expection - value;
-    // return error * step;
 }
 
 // How much current that goes into a component
@@ -46,6 +44,12 @@ struct Frame {
 
 class Steppable {
 public:
+    Steppable() = default;
+    Steppable(const Steppable &) = delete;
+    Steppable(Steppable &&) = delete;
+    Steppable &operator=(const Steppable &) = delete;
+    Steppable &operator=(Steppable &&) = delete;
+
     virtual void step(Frame &frame) = 0;
     virtual ~Steppable() = default;
 };
@@ -61,7 +65,12 @@ private:
     double _direction = 1;
 
 public:
+    Terminal(Terminal &&) = delete;
+    Terminal &operator=(const Terminal &) = default;
+    Terminal &operator=(Terminal &&) = delete;
     Terminal(const Terminal &) = default;
+    ~Terminal() = default;
+
     Terminal(Component *parent, double direction)
         : _parent{parent}
         , _direction{direction} {}
@@ -99,12 +108,16 @@ public:
 // Connection between terminals
 class Node : Steppable {
     std::vector<Terminal *> _connectedTerminals;
-    double _voltage;
+    double _voltage = 0;
 
 public:
     Node(const Node &) = delete;
     Node() = default;
-    virtual ~Node() override = default;
+    Node(Node &&) = delete;
+    Node &operator=(const Node &) = delete;
+    Node &operator=(Node &&) = delete;
+
+    ~Node() override = default;
 
     void addTerminal(Terminal *t) {
         if (!t) {
@@ -152,25 +165,10 @@ class Component : public Steppable {
     std::string _name;
 
 public:
-    double current(const Terminal &terminal) const {
-        auto index = std::distance(_terminals.data(), &terminal);
-        return current(static_cast<size_t>(index));
-    }
-    void incCurrent(Terminal &terminal, double value) {
-        auto index = std::distance(_terminals.data(), &terminal);
-        return incCurrent(static_cast<size_t>(index), value);
-    }
-
-    std::string_view name() const {
-        return _name;
-    }
-
-    void name(std::string_view value) {
-        _name = value;
-    }
-
+    Component(Component &&) = delete;
+    Component &operator=(const Component &) = delete;
+    Component &operator=(Component &&) = delete;
     Component(const Component &) = delete;
-    virtual ~Component() = default;
 
     Component(size_t numTerminals) {
         if (numTerminals == 1) {
@@ -184,6 +182,26 @@ public:
                 {this, -1},
             };
         }
+    }
+
+    ~Component() override = default;
+
+    double current(const Terminal &terminal) const {
+        auto index = std::distance(_terminals.data(), &terminal);
+        return current(static_cast<size_t>(index));
+    }
+    void incCurrent(Terminal &terminal, double value) {
+        auto index = std::distance(_terminals.data(), &terminal);
+        return incCurrent(static_cast<size_t>(index), value);
+    }
+
+    std::string_view name() const {
+        return _name;
+    }
+
+    auto &name(std::string_view value) {
+        _name = value;
+        return *this;
     }
 
     Terminal &terminal(size_t index) {
@@ -202,19 +220,6 @@ public:
         return _terminals;
     }
 
-    // Return mean voltage between two terminals
-    // double meanNodeVoltage() {
-    //     if (_terminals.size() != 2) {
-    //         throw std::runtime_error{
-    //             "trying to run meanVoltage() that does not have two
-    //             terminals"};
-    //     }
-
-    //     return (_terminals.front().node()->voltage() +
-    //             _terminals.back().node()->voltage()) /
-    //            2;
-    // }
-
     virtual void beginFrame() = 0;
 
     virtual double current(size_t n) const {
@@ -224,15 +229,6 @@ public:
     virtual void incCurrent(size_t n, double value) {
         _stepCurrent += terminalDirection(n, value);
     }
-
-    // virtual void verify() {
-    //     for (auto &t: _terminals) {
-    //         // TODO: This is for testing at this stage
-    //         if (!t.node()) {
-    //             throw std::runti
-    //         }
-    //     }
-    // }
 };
 
 constexpr double Terminal::voltage() const {
@@ -256,6 +252,8 @@ struct Ground : public Component {
         : Component{1} {
         name("gnd");
     }
+
+    ~Ground() override = default;
 
     void step(Frame &frame) override {
         // Todo: Make ground pin the voltage of terminal directly to ground
@@ -463,6 +461,24 @@ public:
                                              " has a non-connected terminal"};
                 }
             }
+        }
+    }
+};
+
+void runSimulation(Circuit &circuit, double stepSize) {
+    for (size_t i = 0; i < 1000; ++i) {
+        auto frame = Frame{
+            .stepSize = stepSize,
+        };
+        circuit.step(frame);
+
+        std::cout << "error: " << frame.error << "\t on " << frame.numParameters
+                  << " parameters\n";
+
+        if (frame.error < 0.0001) {
+            std::cout << "Stopped on iteration " << i
+                      << " since error was small enough\n";
+            break;
         }
     }
 };
