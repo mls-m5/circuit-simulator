@@ -10,16 +10,22 @@ struct CustomStream : public std::ostream {
     std::fstream dummyOutput;
     std::stringstream bufferedOutput;
 
-    CustomStream()
+    bool enabled = true;
+
+    CustomStream(bool enabledByDefault = true)
         : std::ostream{nullptr} {
-        rdbuf(std::cout.rdbuf());
+        enable(enabledByDefault);
     }
 
-    ~CustomStream() {
-        // flush();
-    }
+    CustomStream(const CustomStream &) = delete;
+    CustomStream(CustomStream &&) = delete;
+    CustomStream &operator=(const CustomStream &) = delete;
+    CustomStream &operator=(CustomStream &&) = delete;
+
+    ~CustomStream() override {}
 
     void enable(bool status) {
+        enabled = status;
         if (status) {
             rdbuf(std::cout.rdbuf());
         }
@@ -51,4 +57,9 @@ struct CustomStream : public std::ostream {
     }
 };
 
-inline auto dout = CustomStream{};
+inline auto doutInstance = CustomStream{false};
+
+// Prevent extra work from being done
+#define dout                                                                   \
+    if (doutInstance.enabled)                                                  \
+    doutInstance
