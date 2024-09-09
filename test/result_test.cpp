@@ -12,7 +12,7 @@ constexpr auto e = 0.0001;
 TEST_SUIT_BEGIN(result_test)
 
 TEST_CASE("basic resistor test") {
-    dout.useBufferedOutput();
+    doutInstance.useBufferedOutput();
     auto circuit = Circuit{};
     const auto stepSize = .1f;
     std::cout << R"_(
@@ -42,7 +42,7 @@ TEST_CASE("basic resistor test") {
 }
 
 TEST_CASE("double resistor test") {
-    dout.useBufferedOutput();
+    doutInstance.useBufferedOutput();
     auto circuit = Circuit{};
     const auto stepSize = .1f;
     // Possible future ascii-art syntax

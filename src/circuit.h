@@ -51,8 +51,10 @@ public:
                 dout << " v, " << t.voltage() << ", ";
             }
             dout << "\n";
-            dout << "  current " << c->name() << " i0 " << c->current(0)
-                 << " i1 " << c->current(1) << "\n";
+            dout << "  current " << c->name() << " i0 " << c->current(0);
+            if (c->numTerminals() > 1) {
+                dout << " i1 " << c->current(1) << "\n";
+            }
         }
     }
 
@@ -82,7 +84,7 @@ void runSimulation(Circuit &circuit, double stepSize) {
 
         if (frame.error < 0.0001) {
             dout << "Stopped on iteration " << i
-                 << " since error was small enough\n";
+                 << " since error was small enough (" << frame.error << ")\n";
             break;
         }
     }

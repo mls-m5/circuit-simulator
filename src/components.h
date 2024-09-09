@@ -19,9 +19,9 @@ CorrectionResult correction(double value, double expection, double step) {
 }
 
 // How much current that goes into a component
-double terminalDirection(size_t num, double value) {
-    return (num == 0) ? value : -value;
-}
+// double terminalDirection(size_t num, double value) {
+//     return (num == 0) ? value : -value;
+// }
 
 struct Frame {
     double error = 0;
@@ -49,9 +49,6 @@ public:
 // Terminal connected to a component
 class Terminal {
 private:
-    // double _voltage = 0;
-
-    bool _enabled = true;
     class Node *_node = nullptr;
     class Component *_parent = nullptr;
     double _direction = 1;
@@ -90,6 +87,10 @@ public:
 
     constexpr Component *parent() {
         return _parent;
+    }
+
+    double direction() const {
+        return _direction;
     }
 };
 
@@ -181,6 +182,10 @@ public:
         return _terminals.at(index);
     }
 
+    const Terminal &terminal(size_t index) const {
+        return _terminals.at(index);
+    }
+
     size_t numTerminals() const {
         return _terminals.size();
     }
@@ -194,11 +199,13 @@ public:
     }
 
     virtual double current(size_t n) const {
-        return terminalDirection(n, _stepCurrent);
+        return _stepCurrent * terminal(n).direction();
+        // return terminalDirection(n, _stepCurrent);
     }
 
     virtual void incCurrent(size_t n, double value) {
-        _stepCurrent += terminalDirection(n, value);
+        _stepCurrent += value * terminal(n).direction();
+        // _stepCurrent += terminalDirection(n, value);
     }
 };
 
