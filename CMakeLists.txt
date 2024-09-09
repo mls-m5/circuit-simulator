@@ -10,7 +10,7 @@ add_executable(
 target_compile_features(
     circuit-simulator
     PRIVATE
-    cxx_std_17
+    cxx_std_20
     )
 
 file(

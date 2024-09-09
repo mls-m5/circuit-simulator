@@ -1,6 +1,9 @@
 #include <iostream>
 #include <iterator>
 #include <memory>
+#include <span>
+#include <stdexcept>
+#include <string_view>
 #include <vector>
 
 double learningRate = .1;
@@ -14,7 +17,13 @@ double correction(double value, double expection, double step) {
     return error * step;
 }
 
+// How much current that goes into a component
+double terminalDirection(size_t num, double value) {
+    return (num == 0) ? value : -value;
+}
+
 class Steppable {
+public:
     virtual void step(double stepSize) = 0;
 };
 
@@ -75,6 +84,9 @@ public:
     virtual ~Node() = default;
 
     void addTerminal(Terminal *t) {
+        if (!t) {
+            throw std::invalid_argument{"terminal is null"};
+        }
         _connectedTerminals.push_back(t);
         t->node(this);
     }
@@ -109,24 +121,36 @@ public:
 class Component : public Steppable {
     std::vector<Terminal> _terminals;
 
+    // Current going through the component in the pointed direction
+    double _stepCurrent = 0;
+    std::string _name;
+
 public:
     double current(const Terminal &terminal) const {
         auto index = std::distance(_terminals.data(), &terminal);
         return current(index);
     }
-    void incCurrent(Terminal &terminal) {
+    void incCurrent(Terminal &terminal, double value) {
         auto index = std::distance(_terminals.data(), &terminal);
-        return incCurrent(index);
+        return incCurrent(index, value);
     }
 
-    virtual double current(size_t) const = 0;
-    virtual void incCurrent(size_t) = 0;
+    std::string_view name() const {
+        return _name;
+    }
+
+    void name(std::string_view value) {
+        _name = value;
+    }
+
+    // virtual double current(size_t) const = 0;
+    // virtual void incCurrent(size_t, double value) = 0;
 
     Component(const Component &) = delete;
     virtual ~Component() = default;
 
     Component(size_t numTerminals) {
-        if (numTerminals == 0) {
+        if (numTerminals == 1) {
             _terminals = {
                 {this, 1},
             };
@@ -143,19 +167,49 @@ public:
         return _terminals.at(index);
     }
 
-    // Return mean voltage between two terminals
-    double meanNodeVoltage() {
-        if (_terminals.size() != 2) {
-            throw std::runtime_error{
-                "trying to run meanVoltage() that does not have two terminals"};
-        }
-
-        return (_terminals.front().node()->voltage() +
-                _terminals.back().node()->voltage()) /
-               2;
+    int numTerminals() const {
+        return _terminals.size();
     }
 
+    std::span<Terminal> terminals() {
+        return _terminals;
+    }
+
+    std::span<const Terminal> terminals() const {
+        return _terminals;
+    }
+
+    // Return mean voltage between two terminals
+    // double meanNodeVoltage() {
+    //     if (_terminals.size() != 2) {
+    //         throw std::runtime_error{
+    //             "trying to run meanVoltage() that does not have two
+    //             terminals"};
+    //     }
+
+    //     return (_terminals.front().node()->voltage() +
+    //             _terminals.back().node()->voltage()) /
+    //            2;
+    // }
+
     virtual void beginFrame() = 0;
+
+    virtual double current(size_t n) const {
+        return terminalDirection(n, _stepCurrent);
+    }
+
+    virtual void incCurrent(size_t n, double value) {
+        _stepCurrent += terminalDirection(n, value);
+    }
+
+    // virtual void verify() {
+    //     for (auto &t: _terminals) {
+    //         // TODO: This is for testing at this stage
+    //         if (!t.node()) {
+    //             throw std::runti
+    //         }
+    //     }
+    // }
 };
 
 constexpr double Terminal::voltage() const {
@@ -171,35 +225,37 @@ double Terminal::current() const {
 }
 
 void Terminal::incCurrent(double v) {
-    return _parent->incCurrent(*this);
+    return _parent->incCurrent(*this, v);
 }
 
 struct Ground : public Component {
     Ground()
-        : Component{1} {}
+        : Component{1} {
+        name("gnd");
+    }
 
     void step(double stepSize) override {
         // Todo: Make ground pin the voltage of terminal directly to ground
-        terminal(0).incVoltage(-terminal(1).voltage() * stepSize);
+        terminal(0).incVoltage(-terminal(0).voltage() * stepSize);
     }
 
     void beginFrame() override {}
 };
 
 class Battery : public Component {
-    double _stepCurrent = 0;
     double _voltage = 0;
 
 public:
     Battery()
         : Component{2} {}
 
-    double voltage(double v) {
-        return _voltage = v;
+    Battery &voltage(double v) {
+        _voltage = v;
+        return *this;
     }
 
     void beginFrame() override {
-        _stepCurrent = 0;
+        // _stepCurrent = 0;
     }
 
     void step(double stepSize) override {
@@ -211,15 +267,19 @@ public:
         terminal(0).incVoltage(error);
     }
 
-    void current(size_t i) {
-        // return
-    }
+    // double current(size_t n) const override {
+    //     return terminalDirection(n, _stepCurrent);
+    // }
+
+    // void incCurrent(size_t n, double value) override {
+    //     _stepCurrent += terminalDirection(n, value);
+    // }
 };
 
 class Resistor : public Component {
     double _resistance = 1; // Constant
 
-    double _stepCurrent = 0;
+    // double _stepCurrent = 0;
 
 public:
     Resistor()
@@ -234,13 +294,16 @@ public:
         {
             // Correct current part
             auto expectedCurrent = voltageDrop / _resistance;
-            auto c = correction(_stepCurrent, expectedCurrent, stepSize);
-            _stepCurrent += c;
+            auto c = correction(current(0), expectedCurrent, stepSize);
+            // _stepCurrent += c;
+            incCurrent(0, c);
         }
+
+        std::cout << name() << " current " << current(0) << "\n";
 
         {
             // Correct voltage part
-            auto expectedVoltageDrop = _stepCurrent * _resistance;
+            auto expectedVoltageDrop = current(0) * _resistance;
             auto c = correction(voltageDrop, expectedVoltageDrop, stepSize);
 
             terminal(0).incVoltage(-c / 2.);
@@ -248,45 +311,31 @@ public:
         }
     }
 
-    // void stepVoltage() override {
-    //     auto mv = meanNodeVoltage();
-    //     terminal(0).voltage(mv - _stepCurrent * _resistance);
-    //     terminal(1).voltage(mv + _stepCurrent * _resistance);
-    // }
-
-    // void stepCurrent() override {
-    //     auto voltageDrop =
-    //         terminal(1).node()->voltage() - terminal(0).node()->voltage();
-    //     auto current = voltageDrop / _resistance;
-    //     _stepCurrent = lerp(current, _stepCurrent, learningRate);
-    //     terminal(0).current(_stepCurrent);
-    //     terminal(1).current(-_stepCurrent);
-    // }
-
-    double resistance(double value) {
+    auto &resistance(double value) {
         if (!value) {
             throw std::runtime_error{"resistance cannot be zero for resistor"};
         }
-        return _resistance = value;
+        _resistance = value;
+        return *this;
     }
 };
 
 class Log : public Steppable {
     std::vector<double> _data;
-    size_t _frames = 0;
+    // size_t _frames = 0;
     static std::vector<class VoltageProbe *> _probes;
 
 public:
     void step(double stepSize) override {
-        ++_frames;
-        auto required = (_frames + 1) * _probes.size();
-        if (required > _data.size()) {
-            _data.resize(required);
-        }
+        // ++_frames;
+        // auto required = (_frames + 1) * _probes.size();
+        // if (required > _data.size()) {
+        //     _data.resize(required);
+        // }
     }
 
     void log(size_t probeIndex, double value) {
-        _data.at(_frames * _probes.size() + probeIndex) = value;
+        // _data.at(_frames * _probes.size() + probeIndex) = value;
     }
 
     size_t registerProbe(VoltageProbe *probe) {
@@ -294,18 +343,7 @@ public:
         return _probes.size() - 1;
     }
 
-    void print() {
-        for (size_t i = 0; i < _frames; ++i) {
-            std::cout << "probe ";
-
-            for (size_t j = 0; j < _probes.size(); ++j) {
-
-                std::cout << _data.at(i * _probes.size() + j) << " ";
-            }
-
-            std::cout << "\n";
-        }
-    }
+    void print();
 };
 
 std::vector<class VoltageProbe *> Log::_probes;
@@ -322,16 +360,33 @@ public:
         terminal(0).enabled(false);
     }
 
-    // void stepCurrent() override {}
-
-    // void stepVoltage() override {
-    //     probeLog.log(index, terminal(0).node()->voltage());
-    // }
-
-    void step(double stepSize) override {}
+    void step(double stepSize) override {
+        std::cout << "step voltage " << terminal(0).voltage() << "\n";
+    }
 
     void beginFrame() override {}
 };
+
+void Log::print() {
+    // for (size_t i = 0; i < _frames; ++i) {
+    std::cout << "probe ";
+
+    for (size_t j = 0; j < _probes.size(); ++j) {
+        auto &component = _probes.at(j);
+        auto name = component->name();
+        if (!name.empty()) {
+            std::cout << name << ": ";
+        }
+        // std::cout << _data.at(i * _probes.size() + j) << " \t";
+        // std::cout << _probes.at(j)->numTerminals()
+        for (auto &t : component->terminals()) {
+            std::cout << t.voltage() << " \t";
+        }
+    }
+
+    std::cout << "\n";
+    // }
+}
 
 class Circuit {
     std::vector<std::unique_ptr<Component>> _components;
@@ -372,17 +427,36 @@ public:
         for (auto &n : _nodes) {
             n->step(stepSize);
         }
+
+        for (auto &c : _components) {
+            c->step(stepSize);
+        }
+    }
+
+    void verify() {
+        for (auto &c : _components) {
+            for (auto &t : c->terminals()) {
+                if (!t.node()) {
+                    throw std::runtime_error{"component " +
+                                             std::string{c->name()} +
+                                             " has a non-connected terminal"};
+                }
+            }
+        }
     }
 };
 
 int main(int argc, char *argv[]) {
     std::cout << "hello there\n";
 
+    auto stepSize = 0.01;
+
     auto circuit = Circuit{};
 
-    // Possible future ascii-art syntax
-    // Without the numbers
-    std::cout << R"_(
+    if (0) {
+        // Possible future ascii-art syntax
+        // Without the numbers
+        std::cout << R"_(
       ·0----·1--P1
       |     |
       |     R1
@@ -394,18 +468,40 @@ int main(int argc, char *argv[]) {
             G
 )_";
 
-    circuit.create<Battery>({0, 3})->voltage(1.5);
-    circuit.create<Resistor>({1, 2})->resistance(1000);
-    circuit.create<Resistor>({2, 3})->resistance(1000);
-    circuit.create<VoltageProbe>({1});
-    circuit.create<VoltageProbe>({2});
-    circuit.create<Ground>({3});
+        circuit.create<Battery>({0, 3})->voltage(1.5).name("B");
+        circuit.create<Resistor>({1, 2})->resistance(1000).name("R1");
+        circuit.create<Resistor>({2, 3})->resistance(1000).name("R2");
+        circuit.create<VoltageProbe>({1})->name("V1");
+        circuit.create<VoltageProbe>({2})->name("v2");
+        circuit.create<Ground>({3});
+    }
+    else {
+        // Possible future ascii-art syntax
+        // Without the numbers
+        std::cout << R"_(
+      ·-----·1----V1
+      |     |
+      |     R1
+      B     |
+      |     |
+      |     |
+      ·-----·0
+            |
+            G
+)_";
 
-    auto stepSize = 0.001;
+        circuit.create<Battery>({0, 1})->voltage(1.5).name("B");
+        circuit.create<Resistor>({0, 1})->resistance(10).name("R1");
+        // circuit.create<VoltageProbe>({0})->name("V0");
+        circuit.create<VoltageProbe>({1})->name("v1");
+        circuit.create<Ground>({0});
+    }
 
-    for (size_t i = 0; i < 100; ++i) {
+    for (size_t i = 0; i < 1000; ++i) {
         circuit.step(stepSize);
     }
+
+    circuit.verify();
 
     probeLog.print();
 
