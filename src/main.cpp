@@ -263,8 +263,8 @@ public:
         auto error = currentVoltage - _voltage;
 
         // TODO: Check sign
-        terminal(1).incVoltage(-error);
-        terminal(0).incVoltage(error);
+        terminal(1).incVoltage(-error * stepSize);
+        terminal(0).incVoltage(error * stepSize);
     }
 
     // double current(size_t n) const override {
@@ -299,7 +299,7 @@ public:
             incCurrent(0, c);
         }
 
-        std::cout << name() << " current " << current(0) << "\n";
+        // std::cout << name() << " current " << current(0) << "\n";
 
         {
             // Correct voltage part
@@ -361,7 +361,8 @@ public:
     }
 
     void step(double stepSize) override {
-        std::cout << "step voltage " << terminal(0).voltage() << "\n";
+        std::cout << "step voltage " << name() << ": " << terminal(0).voltage()
+                  << "\n";
     }
 
     void beginFrame() override {}
@@ -449,31 +450,34 @@ public:
 int main(int argc, char *argv[]) {
     std::cout << "hello there\n";
 
-    auto stepSize = 0.01;
+    auto stepSize = 0.1;
 
     auto circuit = Circuit{};
 
-    if (0) {
+    if (true) {
         // Possible future ascii-art syntax
         // Without the numbers
         std::cout << R"_(
-      ·0----·1--P1
-      |     |
-      |     R1
-      B     ·2--P2
-      |     R2
-      |     |
-      ·-----·3--P3
+      ·------·2
+      |      |
+      |      R1
+      |      |
+      B=1.5  ·1
+      |      |
+      |      R2
+      |      |
+      ·-----··0
             |
-            G
+            GND
 )_";
 
-        circuit.create<Battery>({0, 3})->voltage(1.5).name("B");
-        circuit.create<Resistor>({1, 2})->resistance(1000).name("R1");
-        circuit.create<Resistor>({2, 3})->resistance(1000).name("R2");
+        circuit.create<Battery>({0, 2})->voltage(1.5).name("B");
+        circuit.create<Resistor>({1, 2})->resistance(1).name("R1");
+        circuit.create<Resistor>({0, 1})->resistance(1).name("R2");
+        circuit.create<VoltageProbe>({0})->name("V0");
         circuit.create<VoltageProbe>({1})->name("V1");
         circuit.create<VoltageProbe>({2})->name("v2");
-        circuit.create<Ground>({3});
+        circuit.create<Ground>({0});
     }
     else {
         // Possible future ascii-art syntax
@@ -497,7 +501,7 @@ int main(int argc, char *argv[]) {
         circuit.create<Ground>({0});
     }
 
-    for (size_t i = 0; i < 1000; ++i) {
+    for (size_t i = 0; i < 100; ++i) {
         circuit.step(stepSize);
     }
 
