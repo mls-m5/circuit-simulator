@@ -17,10 +17,11 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID STREQUAL "Clan
         -Wcast-align
         -Wunused
         -Woverloaded-virtual
-        # -Wconversion
+        -Wconversion
         -Wsign-conversion
         -Wuninitialized
         -Werror
+        -Wno-sign-conversion
     )
 
 elseif (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")

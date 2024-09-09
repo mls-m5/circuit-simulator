@@ -1,5 +1,6 @@
 #pragma once
 
+#include "log.h"
 #include <iostream>
 #include <iterator>
 #include <memory>
@@ -57,7 +58,7 @@ public:
 // Terminal connected to a component
 class Terminal {
 private:
-    double _voltage = 0;
+    // double _voltage = 0;
 
     bool _enabled = true;
     class Node *_node = nullptr;
@@ -75,13 +76,13 @@ public:
         : _parent{parent}
         , _direction{direction} {}
 
-    constexpr bool enabled() const {
-        return _enabled;
-    }
+    // constexpr bool enabled() const {
+    //     return _enabled;
+    // }
 
-    constexpr bool enabled(bool e) {
-        return _enabled = e;
-    }
+    // constexpr bool enabled(bool e) {
+    //     return _enabled = e;
+    // }
 
     constexpr double voltage() const;
     constexpr void incVoltage(double v) const;
@@ -102,6 +103,10 @@ public:
 
     constexpr Node *node() {
         return _node;
+    }
+
+    constexpr Component *parent() {
+        return _parent;
     }
 };
 
@@ -127,22 +132,7 @@ public:
         t->node(this);
     }
 
-    void step(Frame &frame) override {
-        double sumCurrent = 0;
-        for (auto c : _connectedTerminals) {
-            sumCurrent += c->current();
-        }
-
-        auto error =
-            sumCurrent / static_cast<double>(_connectedTerminals.size());
-
-        frame.addError(error);
-
-        // The sum current is expected to be be 0, Kirchhoffs law
-        for (auto c : _connectedTerminals) {
-            c->incCurrent(-error * frame.stepSize);
-        }
-    }
+    void step(Frame &frame) override;
 
     constexpr double voltage() const {
         return _voltage;
@@ -220,8 +210,6 @@ public:
         return _terminals;
     }
 
-    virtual void beginFrame() = 0;
-
     virtual double current(size_t n) const {
         return terminalDirection(n, _stepCurrent);
     }
@@ -230,6 +218,28 @@ public:
         _stepCurrent += terminalDirection(n, value);
     }
 };
+
+void Node::step(Frame &frame) {
+    double sumCurrent = 0;
+    for (auto c : _connectedTerminals) {
+        if (c->parent()->numTerminals() == 1) {
+            continue;
+        }
+        sumCurrent += c->current();
+    }
+
+    auto error = sumCurrent / static_cast<double>(_connectedTerminals.size());
+
+    frame.addError(error);
+
+    // The sum current is expected to be be 0, Kirchhoffs law
+    for (auto c : _connectedTerminals) {
+        if (c->parent()->numTerminals() == 1) {
+            continue;
+        }
+        c->incCurrent(-error * frame.stepSize);
+    }
+}
 
 constexpr double Terminal::voltage() const {
     return _node->voltage();
@@ -261,8 +271,6 @@ struct Ground : public Component {
         frame.addError(error);
         terminal(0).incVoltage(-error * frame.stepSize);
     }
-
-    void beginFrame() override {}
 };
 
 class Battery : public Component {
@@ -275,10 +283,6 @@ public:
     Battery &voltage(double v) {
         _voltage = v;
         return *this;
-    }
-
-    void beginFrame() override {
-        // _stepCurrent = 0;
     }
 
     void step(Frame &frame) override {
@@ -302,13 +306,10 @@ public:
 
     Resistor(const Resistor &) = delete;
 
-    void beginFrame() override {}
-
     void step(Frame &frame) override {
         auto voltageDrop = terminal(1).voltage() - terminal(0).voltage();
-        std::cout << name() << " voltage " << voltageDrop << ", "
-                  << terminal(1).voltage() << ", " << terminal(0).voltage()
-                  << "\n";
+        dout << name() << " voltage " << voltageDrop << ", "
+             << terminal(1).voltage() << ", " << terminal(0).voltage() << "\n";
         {
             // Correct current part
             auto expectedCurrent = voltageDrop / _resistance;
@@ -316,10 +317,10 @@ public:
                 correction(current(0), expectedCurrent, frame.stepSize);
             frame.addError(error);
             incCurrent(0, c);
-            std::cout << name() << " error " << error << "\n";
+            dout << name() << " error " << error << "\n";
         }
 
-        std::cout << name() << " current " << current(0) << "\n";
+        dout << name() << " current " << current(0) << "\n";
 
         {
             // Correct voltage part
@@ -334,7 +335,7 @@ public:
     }
 
     auto &resistance(double value) {
-        if (!value) {
+        if (value == 0.) {
             throw std::runtime_error{"resistance cannot be zero for resistor"};
         }
         _resistance = value;
@@ -344,21 +345,10 @@ public:
 
 class Log : public Steppable {
     std::vector<double> _data;
-    // size_t _frames = 0;
     static std::vector<class VoltageProbe *> _probes;
 
 public:
-    void step(Frame &) override {
-        // ++_frames;
-        // auto required = (_frames + 1) * _probes.size();
-        // if (required > _data.size()) {
-        //     _data.resize(required);
-        // }
-    }
-
-    // void log(size_t probeIndex, double value) {
-    //     // _data.at(_frames * _probes.size() + probeIndex) = value;
-    // }
+    void step(Frame &) override {}
 
     size_t registerProbe(VoltageProbe *probe) {
         _probes.push_back(probe);
@@ -379,35 +369,33 @@ public:
     VoltageProbe()
         : Component{1}
         , index{probeLog.registerProbe(this)} {
-        terminal(0).enabled(false);
+        // terminal(0).enabled(false);
     }
 
     void step(Frame &) override {
-        std::cout << "step voltage " << name() << ": " << terminal(0).voltage()
-                  << "\n";
+        dout << "step voltage " << name() << ": " << terminal(0).voltage()
+             << "\n";
     }
-
-    void beginFrame() override {}
 };
 
 void Log::print() {
     // for (size_t i = 0; i < _frames; ++i) {
-    std::cout << "probe ";
+    dout << "probe ";
 
     for (size_t j = 0; j < _probes.size(); ++j) {
         auto &component = _probes.at(j);
         auto name = component->name();
         if (!name.empty()) {
-            std::cout << name << ": ";
+            dout << name << ": ";
         }
-        // std::cout << _data.at(i * _probes.size() + j) << " \t";
-        // std::cout << _probes.at(j)->numTerminals()
+        // dout << _data.at(i * _probes.size() + j) << " \t";
+        // dout << _probes.at(j)->numTerminals()
         for (auto &t : component->terminals()) {
-            std::cout << t.voltage() << " \t";
+            dout << t.voltage() << " \t";
         }
     }
 
-    std::cout << "\n";
+    dout << "\n";
     // }
 }
 
@@ -453,6 +441,13 @@ public:
 
         for (auto &c : _components) {
             c->step(frame);
+            dout << "Component " << c->name();
+            for (auto &t : c->terminals()) {
+                dout << " v, " << t.voltage() << ", ";
+            }
+            dout << "\n";
+            dout << "  current " << c->name() << " i0 " << c->current(0)
+                 << " i1 " << c->current(1) << "\n";
         }
     }
 
@@ -471,17 +466,18 @@ public:
 
 void runSimulation(Circuit &circuit, double stepSize) {
     for (size_t i = 0; i < 1000; ++i) {
+        dout << " ----------------- step " << i << " ----------------------\n";
         auto frame = Frame{
             .stepSize = stepSize,
         };
         circuit.step(frame);
 
-        std::cout << "error: " << frame.error << "\t on " << frame.numParameters
-                  << " parameters\n";
+        dout << "error: " << frame.error << "\t on " << frame.numParameters
+             << " parameters\n";
 
         if (frame.error < 0.0001) {
-            std::cout << "Stopped on iteration " << i
-                      << " since error was small enough\n";
+            dout << "Stopped on iteration " << i
+                 << " since error was small enough\n";
             break;
         }
     }
