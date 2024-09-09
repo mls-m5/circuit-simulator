@@ -1,6 +1,8 @@
 #include "mls-unit-test/unittest.h"
 #include "simulator.h"
 
+constexpr auto e = 0.0001;
+
 TEST_SUIT_BEGIN(result_test)
 
 TEST_CASE("basic resistor test") {
@@ -25,6 +27,8 @@ TEST_CASE("basic resistor test") {
 
     circuit.verify();
     runSimulation(circuit, stepSize);
+
+    EXPECT_NEAR(probe.terminal(0).voltage(), 1.5, e);
 }
 
 TEST_CASE("double resistor test") {
@@ -46,16 +50,19 @@ TEST_CASE("double resistor test") {
             GND
 )_";
 
-    circuit.create<Battery>({0, 2})->voltage(1.5).name("B");
-    circuit.create<Resistor>({1, 2})->resistance(1).name("R1");
-    circuit.create<Resistor>({0, 1})->resistance(1).name("R2");
+    circuit.create<Battery>({0, 2})->voltage(1).name("B");
+    circuit.create<Resistor>({1, 2})->resistance(10).name("R1");
+    circuit.create<Resistor>({0, 1})->resistance(10).name("R2");
     circuit.create<VoltageProbe>({0})->name("V0");
-    circuit.create<VoltageProbe>({1})->name("V1");
-    circuit.create<VoltageProbe>({2})->name("v2");
+    auto &probe1 = circuit.create<VoltageProbe>({1})->name("V1");
+    auto &probe2 = circuit.create<VoltageProbe>({2})->name("v2");
     circuit.create<Ground>({0});
 
     circuit.verify();
     runSimulation(circuit, stepSize);
+
+    EXPECT_NEAR(probe1.terminal(0).voltage(), 1.5 / 2, e);
+    EXPECT_NEAR(probe2.terminal(0).voltage(), 1.5, e);
 }
 
 TEST_SUIT_END

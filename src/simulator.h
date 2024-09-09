@@ -306,6 +306,9 @@ public:
 
     void step(Frame &frame) override {
         auto voltageDrop = terminal(1).voltage() - terminal(0).voltage();
+        std::cout << name() << " voltage " << voltageDrop << ", "
+                  << terminal(1).voltage() << ", " << terminal(0).voltage()
+                  << "\n";
         {
             // Correct current part
             auto expectedCurrent = voltageDrop / _resistance;
@@ -313,9 +316,10 @@ public:
                 correction(current(0), expectedCurrent, frame.stepSize);
             frame.addError(error);
             incCurrent(0, c);
+            std::cout << name() << " error " << error << "\n";
         }
 
-        // std::cout << name() << " current " << current(0) << "\n";
+        std::cout << name() << " current " << current(0) << "\n";
 
         {
             // Correct voltage part
