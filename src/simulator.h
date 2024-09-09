@@ -53,7 +53,7 @@ public:
 // Terminal connected to a component
 class Terminal {
 private:
-    double _voltage;
+    double _voltage = 0;
 
     bool _enabled = true;
     class Node *_node = nullptr;
@@ -99,12 +99,12 @@ public:
 // Connection between terminals
 class Node : Steppable {
     std::vector<Terminal *> _connectedTerminals;
-    double _voltage = 0;
+    double _voltage;
 
 public:
     Node(const Node &) = delete;
     Node() = default;
-    virtual ~Node() = default;
+    virtual ~Node() override = default;
 
     void addTerminal(Terminal *t) {
         if (!t) {
@@ -354,9 +354,9 @@ public:
         // }
     }
 
-    void log(size_t probeIndex, double value) {
-        // _data.at(_frames * _probes.size() + probeIndex) = value;
-    }
+    // void log(size_t probeIndex, double value) {
+    //     // _data.at(_frames * _probes.size() + probeIndex) = value;
+    // }
 
     size_t registerProbe(VoltageProbe *probe) {
         _probes.push_back(probe);
@@ -380,7 +380,7 @@ public:
         terminal(0).enabled(false);
     }
 
-    void step(Frame &frame) override {
+    void step(Frame &) override {
         std::cout << "step voltage " << name() << ": " << terminal(0).voltage()
                   << "\n";
     }

@@ -1,7 +1,7 @@
 
 #include "simulator.h"
 
-int main(int argc, char *argv[]) {
+int main(int, char **) {
     std::cout << "hello there\n";
 
     constexpr auto stepSize = .1f;
@@ -34,8 +34,6 @@ int main(int argc, char *argv[]) {
         circuit.create<Ground>({0});
     }
     else {
-        // Possible future ascii-art syntax
-        // Without the numbers
         std::cout << R"_(
       ·-----·1----V1
       |     |
