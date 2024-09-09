@@ -1,8 +1,11 @@
+#include "battery.h"
 #include "circuit.h"
 #include "components.h"
+#include "ground.h"
 #include "log.h"
 #include "mls-unit-test/unittest.h"
 #include "probe.h"
+#include "resistor.h"
 
 constexpr auto e = 0.0001;
 

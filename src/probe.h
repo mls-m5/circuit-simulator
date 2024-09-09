@@ -1,6 +1,7 @@
 #pragma once
 
 #include "components.h"
+#include "log.h"
 
 class Log : public Steppable {
     std::vector<double> _data;

@@ -1,19 +1,10 @@
 #pragma once
 
-#include "log.h"
-#include <iostream>
 #include <iterator>
-#include <memory>
 #include <span>
 #include <stdexcept>
 #include <string_view>
 #include <vector>
-
-double learningRate = .1;
-
-double lerp(double a, double b, double t) {
-    return a * (1. - t) + b * t;
-}
 
 struct CorrectionResult {
     double error;
@@ -75,14 +66,6 @@ public:
     Terminal(Component *parent, double direction)
         : _parent{parent}
         , _direction{direction} {}
-
-    // constexpr bool enabled() const {
-    //     return _enabled;
-    // }
-
-    // constexpr bool enabled(bool e) {
-    //     return _enabled = e;
-    // }
 
     constexpr double voltage() const;
     constexpr void incVoltage(double v) const;
@@ -256,89 +239,3 @@ double Terminal::current() const {
 void Terminal::incCurrent(double v) {
     return _parent->incCurrent(*this, v);
 }
-
-struct Ground : public Component {
-    Ground()
-        : Component{1} {
-        name("gnd");
-    }
-
-    ~Ground() override = default;
-
-    void step(Frame &frame) override {
-        // Todo: Make ground pin the voltage of terminal directly to ground
-        auto error = terminal(0).voltage();
-        frame.addError(error);
-        terminal(0).incVoltage(-error * frame.stepSize);
-    }
-};
-
-class Battery : public Component {
-    double _voltage = 0;
-
-public:
-    Battery()
-        : Component{2} {}
-
-    Battery &voltage(double v) {
-        _voltage = v;
-        return *this;
-    }
-
-    void step(Frame &frame) override {
-        auto currentVoltage = terminal(1).voltage() - terminal(0).voltage();
-        auto error = currentVoltage - _voltage;
-
-        frame.addError(error);
-        error /= 2;
-
-        terminal(1).incVoltage(-error * frame.stepSize);
-        terminal(0).incVoltage(error * frame.stepSize);
-    }
-};
-
-class Resistor : public Component {
-    double _resistance = 1; // Constant
-
-public:
-    Resistor()
-        : Component{2} {}
-
-    Resistor(const Resistor &) = delete;
-
-    void step(Frame &frame) override {
-        auto voltageDrop = terminal(1).voltage() - terminal(0).voltage();
-        dout << name() << " voltage " << voltageDrop << ", "
-             << terminal(1).voltage() << ", " << terminal(0).voltage() << "\n";
-        {
-            // Correct current part
-            auto expectedCurrent = voltageDrop / _resistance;
-            auto [error, c] =
-                correction(current(0), expectedCurrent, frame.stepSize);
-            frame.addError(error);
-            incCurrent(0, c);
-            dout << name() << " error " << error << "\n";
-        }
-
-        dout << name() << " current " << current(0) << "\n";
-
-        {
-            // Correct voltage part
-            auto expectedVoltageDrop = current(0) * _resistance;
-            auto [error, c] =
-                correction(voltageDrop, expectedVoltageDrop, frame.stepSize);
-            frame.addError(error);
-
-            terminal(0).incVoltage(-c / 2.);
-            terminal(1).incVoltage(c / 2.);
-        }
-    }
-
-    auto &resistance(double value) {
-        if (value == 0.) {
-            throw std::runtime_error{"resistance cannot be zero for resistor"};
-        }
-        _resistance = value;
-        return *this;
-    }
-};

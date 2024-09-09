@@ -2,6 +2,7 @@
 
 #include "components.h"
 #include "probe.h"
+#include <memory>
 
 class Circuit {
     std::vector<std::unique_ptr<Component>> _components;
