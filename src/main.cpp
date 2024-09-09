@@ -12,9 +12,18 @@ double lerp(double a, double b, double t) {
     return a * (1. - t) + b * t;
 }
 
-double correction(double value, double expection, double step) {
-    auto error = expection - value;
-    return error * step;
+struct CorrectionResult {
+    double error;
+    double correction;
+};
+
+CorrectionResult correction(double value, double expection, double step) {
+    auto res = CorrectionResult{};
+    res.error = expection - value;
+    res.correction = res.error * step;
+    return res;
+    // auto error = expection - value;
+    // return error * step;
 }
 
 // How much current that goes into a component
@@ -22,9 +31,20 @@ double terminalDirection(size_t num, double value) {
     return (num == 0) ? value : -value;
 }
 
+struct Frame {
+    double error = 0;
+    double stepSize = .1;
+    size_t numParameters = 0;
+
+    void addError(double v) {
+        error += std::abs(v);
+        ++numParameters;
+    }
+};
+
 class Steppable {
 public:
-    virtual void step(double stepSize) = 0;
+    virtual void step(Frame &frame) = 0;
 };
 
 // Terminal connected to a component
@@ -91,17 +111,19 @@ public:
         t->node(this);
     }
 
-    void step(double stepSize) override {
+    void step(Frame &frame) override {
         double sumCurrent = 0;
         for (auto c : _connectedTerminals) {
             sumCurrent += c->current();
         }
 
-        auto correction = sumCurrent / _connectedTerminals.size();
+        auto error = sumCurrent / _connectedTerminals.size();
+
+        frame.addError(error);
 
         // The sum current is expected to be be 0, Kirchhoffs law
         for (auto c : _connectedTerminals) {
-            c->incCurrent(-correction * stepSize);
+            c->incCurrent(-error * frame.stepSize);
         }
     }
 
@@ -234,9 +256,11 @@ struct Ground : public Component {
         name("gnd");
     }
 
-    void step(double stepSize) override {
+    void step(Frame &frame) override {
         // Todo: Make ground pin the voltage of terminal directly to ground
-        terminal(0).incVoltage(-terminal(0).voltage() * stepSize);
+        auto error = terminal(0).voltage();
+        frame.addError(error);
+        terminal(0).incVoltage(-error * frame.stepSize);
     }
 
     void beginFrame() override {}
@@ -258,28 +282,20 @@ public:
         // _stepCurrent = 0;
     }
 
-    void step(double stepSize) override {
+    void step(Frame &frame) override {
         auto currentVoltage = terminal(1).voltage() - terminal(0).voltage();
         auto error = currentVoltage - _voltage;
 
-        // TODO: Check sign
-        terminal(1).incVoltage(-error * stepSize);
-        terminal(0).incVoltage(error * stepSize);
+        frame.addError(error);
+        error /= 2;
+
+        terminal(1).incVoltage(-error * frame.stepSize);
+        terminal(0).incVoltage(error * frame.stepSize);
     }
-
-    // double current(size_t n) const override {
-    //     return terminalDirection(n, _stepCurrent);
-    // }
-
-    // void incCurrent(size_t n, double value) override {
-    //     _stepCurrent += terminalDirection(n, value);
-    // }
 };
 
 class Resistor : public Component {
     double _resistance = 1; // Constant
-
-    // double _stepCurrent = 0;
 
 public:
     Resistor()
@@ -289,13 +305,14 @@ public:
 
     void beginFrame() override {}
 
-    void step(double stepSize) override {
+    void step(Frame &frame) override {
         auto voltageDrop = terminal(1).voltage() - terminal(0).voltage();
         {
             // Correct current part
             auto expectedCurrent = voltageDrop / _resistance;
-            auto c = correction(current(0), expectedCurrent, stepSize);
-            // _stepCurrent += c;
+            auto [error, c] =
+                correction(current(0), expectedCurrent, frame.stepSize);
+            frame.addError(error);
             incCurrent(0, c);
         }
 
@@ -304,7 +321,9 @@ public:
         {
             // Correct voltage part
             auto expectedVoltageDrop = current(0) * _resistance;
-            auto c = correction(voltageDrop, expectedVoltageDrop, stepSize);
+            auto [error, c] =
+                correction(voltageDrop, expectedVoltageDrop, frame.stepSize);
+            frame.addError(error);
 
             terminal(0).incVoltage(-c / 2.);
             terminal(1).incVoltage(c / 2.);
@@ -326,7 +345,7 @@ class Log : public Steppable {
     static std::vector<class VoltageProbe *> _probes;
 
 public:
-    void step(double stepSize) override {
+    void step(Frame &) override {
         // ++_frames;
         // auto required = (_frames + 1) * _probes.size();
         // if (required > _data.size()) {
@@ -360,7 +379,7 @@ public:
         terminal(0).enabled(false);
     }
 
-    void step(double stepSize) override {
+    void step(Frame &frame) override {
         std::cout << "step voltage " << name() << ": " << terminal(0).voltage()
                   << "\n";
     }
@@ -422,15 +441,15 @@ public:
         return static_cast<T *>(_components.back().get());
     }
 
-    void step(double stepSize) {
-        probeLog.step(stepSize);
+    void step(Frame &frame) {
+        probeLog.step(frame);
 
         for (auto &n : _nodes) {
-            n->step(stepSize);
+            n->step(frame);
         }
 
         for (auto &c : _components) {
-            c->step(stepSize);
+            c->step(frame);
         }
     }
 
@@ -450,7 +469,7 @@ public:
 int main(int argc, char *argv[]) {
     std::cout << "hello there\n";
 
-    auto stepSize = 0.1;
+    constexpr auto stepSize = .1f;
 
     auto circuit = Circuit{};
 
@@ -501,8 +520,20 @@ int main(int argc, char *argv[]) {
         circuit.create<Ground>({0});
     }
 
-    for (size_t i = 0; i < 100; ++i) {
-        circuit.step(stepSize);
+    for (size_t i = 0; i < 1000; ++i) {
+        auto frame = Frame{
+            .stepSize = stepSize,
+        };
+        circuit.step(frame);
+
+        std::cout << "error: " << frame.error << "\t on " << frame.numParameters
+                  << " parameters\n";
+
+        if (frame.error < 0.0001) {
+            std::cout << "Stopped on iteration " << i
+                      << " since error was small\n";
+            break;
+        }
     }
 
     circuit.verify();
