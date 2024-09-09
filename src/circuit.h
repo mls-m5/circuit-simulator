@@ -56,6 +56,14 @@ public:
                 dout << " i1 " << c->current(1) << "\n";
             }
         }
+
+        for (auto &n : _nodes) {
+            n->applyCorrection();
+        }
+
+        for (auto &c : _components) {
+            c->applyCorrection();
+        }
     }
 
     void verify() {

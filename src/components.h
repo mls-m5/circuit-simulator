@@ -1,6 +1,7 @@
 #pragma once
 
 #include <iterator>
+#include <ostream>
 #include <span>
 #include <stdexcept>
 #include <string_view>
@@ -18,10 +19,48 @@ CorrectionResult correction(double value, double expection, double step) {
     return res;
 }
 
-// How much current that goes into a component
-// double terminalDirection(size_t num, double value) {
-//     return (num == 0) ? value : -value;
-// }
+using Constant = double;
+
+class Variable {
+    double _previous = 0;
+    double _currentValue = 0;
+    double _correction = 0;
+
+public:
+    Variable() = default;
+
+    Variable(double defaultValue)
+        : _previous{defaultValue}
+        , _currentValue{defaultValue} {}
+
+    constexpr void applyCorrection() {
+        _previous = _currentValue;
+        _currentValue += _correction;
+        _correction = 0;
+    }
+
+    constexpr void operator+=(double value) {
+        _correction += value;
+    }
+
+    constexpr double operator*(double value) const {
+        return _currentValue * value;
+    }
+
+    constexpr double value() const {
+        return _currentValue;
+    }
+
+    // double derivative(double stepSize) const {
+    //     // TODO: Look at this, I dont think this is how I should do it
+    //     return (_currentValue + _correction - _previous);
+    // }
+
+    friend std::ostream &operator<<(std::ostream &stream, const Variable &var) {
+        stream << var._currentValue << "(" << var._correction << ")";
+        return stream;
+    }
+};
 
 struct Frame {
     double error = 0;
@@ -64,7 +103,7 @@ public:
         : _parent{parent}
         , _direction{direction} {}
 
-    constexpr double voltage() const;
+    constexpr const Variable &voltage() const;
     constexpr void incVoltage(double v) const;
 
     double current() const;
@@ -97,7 +136,7 @@ public:
 // Connection between terminals
 class Node : Steppable {
     std::vector<Terminal *> _connectedTerminals;
-    double _voltage = 0;
+    Variable _voltage = 0;
 
 public:
     Node(const Node &) = delete;
@@ -118,7 +157,7 @@ public:
 
     void step(Frame &frame) override;
 
-    constexpr double voltage() const {
+    constexpr const Variable &voltage() const {
         return _voltage;
     }
 
@@ -126,8 +165,8 @@ public:
         _voltage += value;
     }
 
-    constexpr double voltage(double v) {
-        return _voltage = v;
+    constexpr void applyCorrection() {
+        _voltage.applyCorrection();
     }
 };
 
@@ -135,7 +174,7 @@ class Component : public Steppable {
     std::vector<Terminal> _terminals;
 
     // Current going through the component in the pointed direction
-    double _stepCurrent = 0;
+    Variable _stepCurrent = 0;
     std::string _name;
 
 public:
@@ -200,12 +239,15 @@ public:
 
     virtual double current(size_t n) const {
         return _stepCurrent * terminal(n).direction();
-        // return terminalDirection(n, _stepCurrent);
     }
 
     virtual void incCurrent(size_t n, double value) {
         _stepCurrent += value * terminal(n).direction();
         // _stepCurrent += terminalDirection(n, value);
+    }
+
+    virtual void applyCorrection() {
+        _stepCurrent.applyCorrection();
     }
 };
 
@@ -231,7 +273,7 @@ void Node::step(Frame &frame) {
     }
 }
 
-constexpr double Terminal::voltage() const {
+constexpr const Variable &Terminal::voltage() const {
     return _node->voltage();
 }
 

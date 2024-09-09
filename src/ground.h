@@ -12,7 +12,7 @@ struct Ground : public Component {
 
     void step(Frame &frame) override {
         // Todo: Make ground pin the voltage of terminal directly to ground
-        auto error = terminal(0).voltage();
+        auto error = terminal(0).voltage().value();
         frame.addError(error);
         terminal(0).incVoltage(-error * frame.stepSize);
     }

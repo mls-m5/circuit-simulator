@@ -3,7 +3,7 @@
 #include "components.h"
 
 class Battery : public Component {
-    double _voltage = 0;
+    double _voltage = 0; // Constant
 
 public:
     Battery()
@@ -15,7 +15,8 @@ public:
     }
 
     void step(Frame &frame) override {
-        auto currentVoltage = terminal(1).voltage() - terminal(0).voltage();
+        auto currentVoltage =
+            terminal(1).voltage().value() - terminal(0).voltage().value();
         auto error = currentVoltage - _voltage;
 
         frame.addError(error);

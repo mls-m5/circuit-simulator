@@ -1,6 +1,7 @@
 #pragma once
 
 #include "components.h"
+#include "log.h"
 
 class Resistor : public Component {
     double _resistance = 1; // Constant
@@ -12,7 +13,8 @@ public:
     Resistor(const Resistor &) = delete;
 
     void step(Frame &frame) override {
-        auto voltageDrop = terminal(1).voltage() - terminal(0).voltage();
+        auto voltageDrop =
+            terminal(1).voltage().value() - terminal(0).voltage().value();
         dout << name() << " voltage " << voltageDrop << ", "
              << terminal(1).voltage() << ", " << terminal(0).voltage() << "\n";
         {
