@@ -1,6 +1,7 @@
 #pragma once
 
 #include "components.h"
+#include "probe.h"
 
 class Circuit {
     std::vector<std::unique_ptr<Component>> _components;

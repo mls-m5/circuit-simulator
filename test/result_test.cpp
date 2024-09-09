@@ -2,6 +2,7 @@
 #include "components.h"
 #include "log.h"
 #include "mls-unit-test/unittest.h"
+#include "probe.h"
 
 constexpr auto e = 0.0001;
 
@@ -32,6 +33,7 @@ TEST_CASE("basic resistor test") {
     runSimulation(circuit, stepSize);
 
     dout.flush(2000);
+    probeLog.print();
 
     EXPECT_NEAR(probe.terminal(0).voltage(), 1.5, e);
 }
@@ -68,6 +70,7 @@ TEST_CASE("double resistor test") {
     runSimulation(circuit, stepSize);
 
     dout.flush(2000);
+    probeLog.print();
 
     EXPECT_NEAR(probe1.terminal(0).voltage(), 1.5 / 2, e);
     EXPECT_NEAR(probe2.terminal(0).voltage(), 1.5, e);
