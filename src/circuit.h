@@ -1,7 +1,7 @@
 #pragma once
 
 #include "components.h"
-#include "probe.h"
+#include "log.h"
 #include <memory>
 
 class Circuit {

@@ -272,6 +272,28 @@ public:
     virtual void applyCorrection() {
         _current.applyCorrection();
     }
+
+    void applyExpectedVoltage(Frame &frame, double expectedVoltage) {
+        auto currentVoltage =
+            terminal(1).voltage().value() - terminal(0).voltage().value();
+
+        auto [error, c] =
+            correction(currentVoltage, expectedVoltage, frame.learningRate);
+        frame.addError(error);
+
+        c /= 2.;
+
+        terminal(0).incVoltage(-c);
+        terminal(1).incVoltage(c);
+
+        // auto error = currentVoltage - expectedVoltage;
+
+        // frame.addError(error);
+        // error /= 2;
+
+        // terminal(1).incVoltage(-error * frame.learningRate);
+        // terminal(0).incVoltage(error * frame.learningRate);
+    }
 };
 
 void Node::step(Frame &frame) {

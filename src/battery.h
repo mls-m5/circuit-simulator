@@ -15,14 +15,16 @@ public:
     }
 
     void step(Frame &frame) override {
-        auto currentVoltage =
-            terminal(1).voltage().value() - terminal(0).voltage().value();
-        auto error = currentVoltage - _voltage;
+        applyExpectedVoltage(frame, _voltage);
+        // auto currentVoltage =
+        //     terminal(1).voltage().value() - terminal(0).voltage().value();
 
-        frame.addError(error);
-        error /= 2;
+        // auto error = currentVoltage - _voltage;
 
-        terminal(1).incVoltage(-error * frame.learningRate);
-        terminal(0).incVoltage(error * frame.learningRate);
+        // frame.addError(error);
+        // error /= 2;
+
+        // terminal(1).incVoltage(-error * frame.learningRate);
+        // terminal(0).incVoltage(error * frame.learningRate);
     }
 };
