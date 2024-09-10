@@ -28,9 +28,7 @@ class VoltageProbe : public Component {
 public:
     VoltageProbe()
         : Component{1}
-        , index{probeLog.registerProbe(this)} {
-        // terminal(0).enabled(false);
-    }
+        , index{probeLog.registerProbe(this)} {}
 
     void step(Frame &) override {
         dout << "step voltage " << name() << ": " << terminal(0).voltage()
@@ -39,7 +37,6 @@ public:
 };
 
 void Log::print() {
-    // for (size_t i = 0; i < _frames; ++i) {
     dout << "probe ";
 
     for (size_t j = 0; j < _probes.size(); ++j) {
@@ -48,13 +45,11 @@ void Log::print() {
         if (!name.empty()) {
             dout << name << ": ";
         }
-        // dout << _data.at(i * _probes.size() + j) << " \t";
-        // dout << _probes.at(j)->numTerminals()
+
         for (auto &t : component->terminals()) {
             dout << t.voltage() << " \t";
         }
     }
 
     dout << "\n";
-    // }
 }

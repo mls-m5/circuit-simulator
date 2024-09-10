@@ -243,7 +243,6 @@ public:
 
     virtual void incCurrent(size_t n, double value) {
         _stepCurrent += value * terminal(n).direction();
-        // _stepCurrent += terminalDirection(n, value);
     }
 
     virtual void applyCorrection() {
@@ -253,18 +252,20 @@ public:
 
 void Node::step(Frame &frame) {
     double sumCurrent = 0;
+    size_t numTerminals = 0;
     for (auto c : _connectedTerminals) {
         if (c->parent()->numTerminals() == 1) {
             continue;
         }
         sumCurrent += c->current();
+        ++numTerminals;
     }
 
-    auto error = sumCurrent / static_cast<double>(_connectedTerminals.size());
+    auto error = sumCurrent / static_cast<double>(numTerminals);
 
     frame.addError(error);
 
-    // The sum current is expected to be be 0, Kirchhoffs law
+    // The sum current is expected to be be 0: Kirchhoffs law
     for (auto c : _connectedTerminals) {
         if (c->parent()->numTerminals() == 1) {
             continue;
