@@ -57,19 +57,19 @@ public:
         return _currentValue;
     }
 
-    double derivative(double time) const {
+    constexpr double derivative(double time) const {
         return (_currentValue - _previous) / time;
     }
 
-    void incDeriviative(double time, double value) {
+    constexpr void incDeriviative(double time, double value) {
         _currentValue += value * time;
     }
 
-    double integral(double time) const {
+    constexpr double integral(double time) const {
         return _integral + (_currentValue + _previous) / 2. * time;
     }
 
-    void incIntegral(double time, double value) {
+    constexpr void incIntegral(double time, double value) {
         _currentValue += value / time * 2.;
     }
 

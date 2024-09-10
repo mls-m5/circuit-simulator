@@ -5,7 +5,7 @@
 
 class Capacitor : public Component {
     double _capacitance = 1;
-    double _charge = 0;
+    // double _charge = 0;
 
 public:
     Capacitor()
@@ -14,9 +14,9 @@ public:
     ~Capacitor() override {}
 
     void step(Frame &frame) override {
-        auto d1 = terminal(1).voltage().derivative(frame.timeStep);
-        auto d2 = terminal(0).voltage().derivative(frame.timeStep);
-        auto dVoltageDrop = d1 - d2;
+        auto d3 = terminal(1).voltage().derivative(frame.timeStep);
+        auto d1 = terminal(0).voltage().derivative(frame.timeStep);
+        auto dVoltageDrop = d3 - d1;
         dout << name() << " dvoltage/dt " << dVoltageDrop << ", "
              << terminal(1).voltage().derivative(frame.timeStep) << ", "
              << terminal(0).voltage().derivative(frame.timeStep) << "\n";
@@ -30,7 +30,7 @@ public:
         }
 
         {
-            auto expectedCurrent
+            // auto expectedCurrent
         }
     }
 

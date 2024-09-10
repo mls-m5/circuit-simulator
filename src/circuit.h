@@ -38,7 +38,7 @@ public:
     }
 
     void step(Frame &frame) {
-        probeLog.step(frame);
+        // probeLog.step(frame);
 
         for (auto &n : _nodes) {
             n->step(frame);
@@ -51,7 +51,8 @@ public:
                 dout << " v, " << t.voltage() << ", ";
             }
             dout << "\n";
-            dout << "  current " << c->name() << " i0 " << c->current(0);
+            dout << "  current " << c->name() << " i0 " << c->current(0)
+                 << "\n";
             if (c->numTerminals() > 1) {
                 dout << " i1 " << c->current(1) << "\n";
             }

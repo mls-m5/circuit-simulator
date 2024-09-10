@@ -1,4 +1,5 @@
 #include "battery.h"
+#include "capacitor.h"
 #include "circuit.h"
 #include "components.h"
 #include "ground.h"
@@ -36,7 +37,7 @@ TEST_CASE("basic resistor test") {
     runSimulation(circuit, stepSize);
 
     dout.flush(2000);
-    probeLog.print();
+    // probeLog.print();
 
     EXPECT_NEAR(probe.terminal(0).voltage().value(), 1.5, e);
 }
@@ -73,7 +74,7 @@ TEST_CASE("double resistor test") {
     runSimulation(circuit, stepSize);
 
     dout.flush(2000);
-    probeLog.print();
+    // probeLog.print();
 
     EXPECT_NEAR(probe1.terminal(0).voltage().value(), 1.5 / 2, e);
     EXPECT_NEAR(probe2.terminal(0).voltage().value(), 1.5, e);
@@ -99,8 +100,8 @@ TEST_CASE("basic capacitor") {
             GND
 )_";
 
-    circuit.create<Battery>({0, 2})->voltage(1.5).name("B");
-    circuit.create<Capacitor>({1, 2})->resistance(10).name("R1");
+    circuit.create<Battery>({0, 1})->voltage(1.5).name("B");
+    circuit.create<Capacitor>({0, 1})->capacitance(10).name("R1");
     auto &probe1 = circuit.create<VoltageProbe>({1})->name("V1");
     circuit.create<Ground>({0});
 
@@ -108,9 +109,9 @@ TEST_CASE("basic capacitor") {
     runSimulation(circuit, stepSize);
 
     dout.flush(2000);
-    probeLog.print();
+    // probeLog.print();
 
-    EXPECT_NEAR(probe1.terminal(0).voltage().value(), 1.5 / 2, e);
+    EXPECT_NEAR(probe1.terminal(0).voltage().value(), 1.5, e);
 }
 
 TEST_SUIT_END
