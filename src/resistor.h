@@ -12,14 +12,6 @@ public:
 
     Resistor(const Resistor &) = delete;
 
-    void applyExpectedCurrent(Frame &frame, double expectedCurrent) {
-        auto [error, c] =
-            correction(current(0), expectedCurrent, frame.learningRate);
-        frame.addError(error);
-        incCurrent(0, c);
-        dout << name() << " error " << error << "\n";
-    }
-
     void step(Frame &frame) override {
         {
             auto voltageDrop =
@@ -34,14 +26,15 @@ public:
             // frame.addError(error);
             // incCurrent(0, c);
             // dout << name() << " error " << error << "\n";
-            applyExpectedCurrent(frame, expectedCurrent);
+            applyExpectedCurrent(frame, expectedCurrent, 1);
+            // dout << name() << " error " << error << "\n";
         }
 
-        dout << name() << " current " << current(0) << "\n";
+        dout << name() << " current " << currentValue(0) << "\n";
 
         {
             // Correct voltage part
-            auto expectedVoltageDrop = current(0) * _resistance;
+            auto expectedVoltageDrop = currentValue(0) * _resistance;
             // auto [error, c] =
             //     correction(voltageDrop, expectedVoltageDrop,
             //     frame.learningRate);
@@ -50,7 +43,7 @@ public:
             // terminal(0).incVoltage(-c / 2.);
             // terminal(1).incVoltage(c / 2.);
 
-            applyExpectedVoltage(frame, expectedVoltageDrop);
+            applyExpectedVoltage(frame, expectedVoltageDrop, 1);
         }
     }
 

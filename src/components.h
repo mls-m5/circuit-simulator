@@ -231,7 +231,7 @@ public:
 
     double current(const Terminal &terminal) const {
         auto index = std::distance(_terminals.data(), &terminal);
-        return current(static_cast<size_t>(index));
+        return currentValue(static_cast<size_t>(index));
     }
     void incCurrent(Terminal &terminal, double value) {
         auto index = std::distance(_terminals.data(), &terminal);
@@ -267,7 +267,15 @@ public:
         return _terminals;
     }
 
-    virtual double current(size_t n) const {
+    Variable &current() {
+        return _current;
+    }
+
+    const Variable &current() const {
+        return _current;
+    }
+
+    virtual double currentValue(size_t n) const {
         return _current * terminal(n).direction();
     }
 
@@ -279,7 +287,11 @@ public:
         _current.applyCorrection();
     }
 
-    void applyExpectedVoltage(Frame &frame, double expectedVoltage) {
+    // multiplier should be timeStep for derivatives and 1/timestep for
+    // integrals
+    void applyExpectedVoltage(Frame &frame,
+                              double expectedVoltage,
+                              double multiplier) {
         auto currentVoltage =
             terminal(1).voltage().value() - terminal(0).voltage().value();
 
@@ -289,8 +301,17 @@ public:
 
         c /= 2.;
 
-        terminal(0).incVoltage(-c);
-        terminal(1).incVoltage(c);
+        terminal(0).incVoltage(-c * multiplier);
+        terminal(1).incVoltage(c * multiplier);
+    }
+
+    void applyExpectedCurrent(Frame &frame,
+                              double expectedCurrent,
+                              double multiplier) {
+        auto [error, c] =
+            correction(currentValue(0), expectedCurrent, frame.learningRate);
+        frame.addError(error);
+        incCurrent(0, c * multiplier);
     }
 };
 

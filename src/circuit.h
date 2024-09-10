@@ -51,10 +51,10 @@ public:
                 dout << " v, " << t.voltage() << ", ";
             }
             dout << "\n";
-            dout << "  current " << c->name() << " i0 " << c->current(0)
+            dout << "  current " << c->name() << " i0 " << c->currentValue(0)
                  << "\n";
             if (c->numTerminals() > 1) {
-                dout << " i1 " << c->current(1) << "\n";
+                dout << " i1 " << c->currentValue(1) << "\n";
             }
         }
 

@@ -15,7 +15,7 @@ public:
     }
 
     void step(Frame &frame) override {
-        applyExpectedVoltage(frame, _voltage);
+        applyExpectedVoltage(frame, _voltage, 1);
         // auto currentVoltage =
         //     terminal(1).voltage().value() - terminal(0).voltage().value();
 
