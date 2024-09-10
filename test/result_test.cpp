@@ -109,9 +109,9 @@ TEST_CASE("basic capacitor") {
     runSimulation(circuit, stepSize);
 
     dout.flush(2000);
-    // probeLog.print();
 
     EXPECT_NEAR(probe1.terminal(0).voltage().value(), 1.5, e);
+    EXPECT_NEAR(circuit.node(0)->current(), 0, e);
 }
 
 TEST_SUIT_END

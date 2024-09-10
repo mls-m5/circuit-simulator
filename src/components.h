@@ -156,6 +156,7 @@ public:
 class Node : Steppable {
     std::vector<Terminal *> _connectedTerminals;
     Variable _voltage = 0;
+    double _currentFlow = 0; // Used only for statistics, not for equations
 
 public:
     Node(const Node &) = delete;
@@ -175,6 +176,11 @@ public:
     }
 
     void step(Frame &frame) override;
+
+    // Get how much current flows through this node
+    double current() {
+        return _currentFlow;
+    }
 
     constexpr const Variable &voltage() const {
         return _voltage;
@@ -285,26 +291,23 @@ public:
 
         terminal(0).incVoltage(-c);
         terminal(1).incVoltage(c);
-
-        // auto error = currentVoltage - expectedVoltage;
-
-        // frame.addError(error);
-        // error /= 2;
-
-        // terminal(1).incVoltage(-error * frame.learningRate);
-        // terminal(0).incVoltage(error * frame.learningRate);
     }
 };
 
 void Node::step(Frame &frame) {
     double sumCurrent = 0;
     size_t numTerminals = 0;
+    _currentFlow = 0;
     for (auto c : _connectedTerminals) {
         if (c->parent()->numTerminals() == 1) {
             continue;
         }
-        sumCurrent += c->current();
+        auto current = c->current();
+        sumCurrent += current;
         ++numTerminals;
+        if (current > 0) {
+            _currentFlow += current;
+        }
     }
 
     auto error = sumCurrent / static_cast<double>(numTerminals);
