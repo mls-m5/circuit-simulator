@@ -21,7 +21,7 @@ public:
             // Correct current part
             auto expectedCurrent = voltageDrop / _resistance;
             auto [error, c] =
-                correction(current(0), expectedCurrent, frame.stepSize);
+                correction(current(0), expectedCurrent, frame.learningRate);
             frame.addError(error);
             incCurrent(0, c);
             dout << name() << " error " << error << "\n";
@@ -33,7 +33,7 @@ public:
             // Correct voltage part
             auto expectedVoltageDrop = current(0) * _resistance;
             auto [error, c] =
-                correction(voltageDrop, expectedVoltageDrop, frame.stepSize);
+                correction(voltageDrop, expectedVoltageDrop, frame.learningRate);
             frame.addError(error);
 
             terminal(0).incVoltage(-c / 2.);

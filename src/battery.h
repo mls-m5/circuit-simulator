@@ -22,7 +22,7 @@ public:
         frame.addError(error);
         error /= 2;
 
-        terminal(1).incVoltage(-error * frame.stepSize);
-        terminal(0).incVoltage(error * frame.stepSize);
+        terminal(1).incVoltage(-error * frame.learningRate);
+        terminal(0).incVoltage(error * frame.learningRate);
     }
 };

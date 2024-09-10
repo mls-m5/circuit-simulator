@@ -79,4 +79,38 @@ TEST_CASE("double resistor test") {
     EXPECT_NEAR(probe2.terminal(0).voltage().value(), 1.5, e);
 }
 
+TEST_CASE("basic capacitor") {
+    doutInstance.useBufferedOutput();
+    auto circuit = Circuit{};
+    const auto stepSize = .1f;
+    // Possible future ascii-art syntax
+    // Without the numbers
+    std::cout << R"_(
+      ·------·1-V1
+      |      |
+      |      |
+      |      |
+      B=1.5  C1
+      |      |
+      |      |
+      |      |
+      ·-----··0
+            |
+            GND
+)_";
+
+    circuit.create<Battery>({0, 2})->voltage(1.5).name("B");
+    circuit.create<Capacitor>({1, 2})->resistance(10).name("R1");
+    auto &probe1 = circuit.create<VoltageProbe>({1})->name("V1");
+    circuit.create<Ground>({0});
+
+    circuit.verify();
+    runSimulation(circuit, stepSize);
+
+    dout.flush(2000);
+    probeLog.print();
+
+    EXPECT_NEAR(probe1.terminal(0).voltage().value(), 1.5 / 2, e);
+}
+
 TEST_SUIT_END

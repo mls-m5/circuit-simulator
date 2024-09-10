@@ -83,7 +83,7 @@ void runSimulation(Circuit &circuit, double stepSize) {
     for (size_t i = 0; i < 1000; ++i) {
         dout << " ----------------- step " << i << " ----------------------\n";
         auto frame = Frame{
-            .stepSize = stepSize,
+            .learningRate = stepSize,
         };
         circuit.step(frame);
 

@@ -14,6 +14,6 @@ struct Ground : public Component {
         // Todo: Make ground pin the voltage of terminal directly to ground
         auto error = terminal(0).voltage().value();
         frame.addError(error);
-        terminal(0).incVoltage(-error * frame.stepSize);
+        terminal(0).incVoltage(-error * frame.learningRate);
     }
 };

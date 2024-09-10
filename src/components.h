@@ -25,18 +25,24 @@ class Variable {
     double _previous = 0;
     double _currentValue = 0;
     double _correction = 0;
+    double _integral =
+        0; // Accummulated value, used for capacitors and inductors
 
 public:
     Variable() = default;
 
-    Variable(double defaultValue)
+    constexpr Variable(double defaultValue)
         : _previous{defaultValue}
         , _currentValue{defaultValue} {}
 
     constexpr void applyCorrection() {
-        _previous = _currentValue;
         _currentValue += _correction;
         _correction = 0;
+    }
+
+    constexpr void stepTime(double time) {
+        _previous = _currentValue;
+        _integral = integral(time);
     }
 
     constexpr void operator+=(double value) {
@@ -51,10 +57,21 @@ public:
         return _currentValue;
     }
 
-    // double derivative(double stepSize) const {
-    //     // TODO: Look at this, I dont think this is how I should do it
-    //     return (_currentValue + _correction - _previous);
-    // }
+    double derivative(double time) const {
+        return (_currentValue - _previous) / time;
+    }
+
+    void incDeriviative(double time, double value) {
+        _currentValue += value * time;
+    }
+
+    double integral(double time) const {
+        return _integral + (_currentValue + _previous) / 2. * time;
+    }
+
+    void incIntegral(double time, double value) {
+        _currentValue += value / time * 2.;
+    }
 
     friend std::ostream &operator<<(std::ostream &stream, const Variable &var) {
         stream << var._currentValue << "(" << var._correction << ")";
@@ -64,7 +81,8 @@ public:
 
 struct Frame {
     double error = 0;
-    double stepSize = .1;
+    double learningRate = .1;
+    double timeStep = .001;
     size_t numParameters = 0;
 
     void addError(double v) {
@@ -105,6 +123,7 @@ public:
 
     constexpr const Variable &voltage() const;
     constexpr void incVoltage(double v) const;
+    constexpr void incVoltageDerivative(double step, double v) const;
 
     double current() const;
     void incCurrent(double v);
@@ -165,6 +184,10 @@ public:
         _voltage += value;
     }
 
+    constexpr void incVoltageDerivative(double time, double value) {
+        _voltage.incDeriviative(time, value);
+    }
+
     constexpr void applyCorrection() {
         _voltage.applyCorrection();
     }
@@ -173,8 +196,9 @@ public:
 class Component : public Steppable {
     std::vector<Terminal> _terminals;
 
-    // Current going through the component in the pointed direction
-    Variable _stepCurrent = 0;
+    // Current going through the component in the direction pointed by the
+    // terminal direction
+    Variable _current = 0;
     std::string _name;
 
 public:
@@ -238,15 +262,15 @@ public:
     }
 
     virtual double current(size_t n) const {
-        return _stepCurrent * terminal(n).direction();
+        return _current * terminal(n).direction();
     }
 
     virtual void incCurrent(size_t n, double value) {
-        _stepCurrent += value * terminal(n).direction();
+        _current += value * terminal(n).direction();
     }
 
     virtual void applyCorrection() {
-        _stepCurrent.applyCorrection();
+        _current.applyCorrection();
     }
 };
 
@@ -270,7 +294,7 @@ void Node::step(Frame &frame) {
         if (c->parent()->numTerminals() == 1) {
             continue;
         }
-        c->incCurrent(-error * frame.stepSize);
+        c->incCurrent(-error * frame.learningRate);
     }
 }
 
@@ -280,6 +304,11 @@ constexpr const Variable &Terminal::voltage() const {
 
 constexpr void Terminal::incVoltage(double v) const {
     return _node->incVoltage(v);
+}
+
+constexpr inline void Terminal::incVoltageDerivative(double time,
+                                                     double v) const {
+    _node->incVoltageDerivative(time, v);
 }
 
 double Terminal::current() const {
