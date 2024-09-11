@@ -28,8 +28,18 @@ class Variable {
     double _integral =
         0; // Accummulated value, used for capacitors and inductors
 
+    Variable *_next = nullptr;
+
 public:
     Variable() = default;
+
+    constexpr void next(Variable *variable) {
+        _next = variable;
+    }
+
+    constexpr Variable *next() {
+        return _next;
+    }
 
     constexpr Variable(double defaultValue)
         : _previous{defaultValue}
@@ -178,8 +188,12 @@ public:
     void step(Frame &frame) override;
 
     // Get how much current flows through this node
-    double current() {
+    constexpr double current() {
         return _currentFlow;
+    }
+
+    constexpr Variable &voltage() {
+        return _voltage;
     }
 
     constexpr const Variable &voltage() const {
@@ -305,6 +319,8 @@ public:
         terminal(1).incVoltage(c * multiplier);
     }
 
+    // multiplier should be timeStep for derivatives and 1/timestep for
+    // integrals
     void applyExpectedCurrent(Frame &frame,
                               double expectedCurrent,
                               double multiplier) {

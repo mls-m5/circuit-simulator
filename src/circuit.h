@@ -7,6 +7,7 @@
 class Circuit {
     std::vector<std::unique_ptr<Component>> _components;
     std::vector<std::unique_ptr<Node>> _nodes;
+    Variable *_variables = nullptr;
 
 public:
     Circuit() {}
@@ -14,6 +15,7 @@ public:
     Node *node(size_t index) {
         while (index + 1 > _nodes.size()) {
             _nodes.push_back(std::make_unique<Node>());
+            add(&_nodes.back()->voltage());
         }
         return _nodes.at(index).get();
     }
@@ -37,9 +39,12 @@ public:
         return static_cast<T *>(_components.back().get());
     }
 
-    void step(Frame &frame) {
-        // probeLog.step(frame);
+    void add(Variable *variable) {
+        variable->next(_variables);
+        _variables = variable;
+    }
 
+    void step(Frame &frame) {
         for (auto &n : _nodes) {
             n->step(frame);
         }
@@ -65,6 +70,11 @@ public:
         for (auto &c : _components) {
             c->applyCorrection();
         }
+
+        for (auto variable = _variables; variable != nullptr;
+             variable = variable->next()) {
+            variable->stepTime(frame.timeStep);
+        }
     }
 
     void verify() {
@@ -80,11 +90,12 @@ public:
     }
 };
 
-void runSimulation(Circuit &circuit, double stepSize) {
+void runSimulation(Circuit &circuit, double timeStep, double learningRate) {
     for (size_t i = 0; i < 1000; ++i) {
         dout << " ----------------- step " << i << " ----------------------\n";
         auto frame = Frame{
-            .learningRate = stepSize,
+            .learningRate = learningRate,
+            .timeStep = timeStep,
         };
         circuit.step(frame);
 

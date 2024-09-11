@@ -53,7 +53,7 @@ struct CustomStream : public std::ostream {
             std::cout.write(str.data() + start, str.size() - start);
         }
 
-        bufferedOutput.clear();
+        bufferedOutput = {};
 
         enable(true); // Redirect to stdout from here
     }

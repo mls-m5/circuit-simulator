@@ -17,21 +17,24 @@ public:
             auto &current = this->current();
             auto _charge = current.integral(frame.timeStep);
 
-#todo figure out this
-
-            auto expectedVoltage = ;
+            auto expectedVoltage = _charge / _capacitance;
+            applyExpectedVoltage(frame, expectedVoltage, 1 / frame.timeStep);
         }
 
         {
             auto d0 = terminal(1).voltage().derivative(frame.timeStep);
             auto d1 = terminal(0).voltage().derivative(frame.timeStep);
-            auto dVoltageDrop = d0 - d1;
+            auto dVoltageDrop = d1 - d0;
             auto expectedCurrent = _capacitance * dVoltageDrop;
-            applyExpectedCurrent(frame, expectedCurrent, 1 / frame.timeStep);
+            applyExpectedCurrent(frame, expectedCurrent, frame.timeStep);
             dout << name() << " dvoltage/dt " << dVoltageDrop << ", "
                  << terminal(1).voltage().derivative(frame.timeStep) << ", "
                  << terminal(0).voltage().derivative(frame.timeStep) << "\n";
         }
+    }
+
+    double charge() const {
+        return current().integral(0);
     }
 
     Capacitor &capacitance(double value) {

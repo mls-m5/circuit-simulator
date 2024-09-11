@@ -10,12 +10,14 @@
 
 constexpr auto e = 0.0001;
 
+constexpr auto learningRate = .1f;
+constexpr auto timeStep = .001f;
+
 TEST_SUIT_BEGIN(result_test)
 
 TEST_CASE("basic resistor test") {
     doutInstance.useBufferedOutput();
     auto circuit = Circuit{};
-    const auto stepSize = .1f;
     std::cout << R"_(
       ·-----·1----V1
       |     |
@@ -34,7 +36,7 @@ TEST_CASE("basic resistor test") {
     circuit.create<Ground>({0});
 
     circuit.verify();
-    runSimulation(circuit, stepSize);
+    runSimulation(circuit, timeStep, learningRate);
 
     dout.flush(2000);
     // probeLog.print();
@@ -45,7 +47,6 @@ TEST_CASE("basic resistor test") {
 TEST_CASE("double resistor test") {
     doutInstance.useBufferedOutput();
     auto circuit = Circuit{};
-    const auto stepSize = .1f;
     // Possible future ascii-art syntax
     // Without the numbers
     std::cout << R"_(
@@ -71,7 +72,7 @@ TEST_CASE("double resistor test") {
     circuit.create<Ground>({0});
 
     circuit.verify();
-    runSimulation(circuit, stepSize);
+    runSimulation(circuit, timeStep, learningRate);
 
     dout.flush(2000);
     // probeLog.print();
@@ -83,7 +84,6 @@ TEST_CASE("double resistor test") {
 TEST_CASE("basic capacitor") {
     doutInstance.useBufferedOutput();
     auto circuit = Circuit{};
-    const auto stepSize = .1f;
     // Possible future ascii-art syntax
     // Without the numbers
     std::cout << R"_(
@@ -101,17 +101,19 @@ TEST_CASE("basic capacitor") {
 )_";
 
     circuit.create<Battery>({0, 1})->voltage(1.5).name("B");
-    circuit.create<Capacitor>({0, 1})->capacitance(10).name("R1");
+    auto &capacitor = circuit.create<Capacitor>({0, 1})->capacitance(10);
+    capacitor.name("C");
     auto &probe1 = circuit.create<VoltageProbe>({1})->name("V1");
     circuit.create<Ground>({0});
 
     circuit.verify();
-    runSimulation(circuit, stepSize);
+    runSimulation(circuit, timeStep, learningRate);
 
-    dout.flush(2000);
+    dout.flush(3000);
 
     EXPECT_NEAR(probe1.terminal(0).voltage().value(), 1.5, e);
     EXPECT_NEAR(circuit.node(0)->current(), 0, e);
+    std::cout << capacitor.charge() << std::endl;
 }
 
 TEST_SUIT_END
