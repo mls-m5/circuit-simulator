@@ -14,9 +14,6 @@ public:
 
     void step(Frame &frame) override {
         {
-            // auto &current = this->current();
-            // auto _charge = current.integral(frame.timeStep);
-
             auto expectedVoltage = charge(frame.timeStep) / _capacitance;
             applyExpectedVoltage(frame, expectedVoltage);
         }

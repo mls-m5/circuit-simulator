@@ -15,7 +15,7 @@ public:
     Node *node(size_t index) {
         while (index + 1 > _nodes.size()) {
             _nodes.push_back(std::make_unique<Node>());
-            add(&_nodes.back()->voltage());
+            add(_nodes.back()->voltage());
         }
         return _nodes.at(index).get();
     }
@@ -24,6 +24,7 @@ public:
                    std::vector<size_t> connections) {
         auto c = component.get();
         _components.push_back(std::move(component));
+        _components.back()->registerVariables([this](Variable &v) { add(v); });
 
         for (size_t i = 0; i < connections.size(); ++i) {
             auto &terminal = c->terminal(i);
@@ -39,9 +40,9 @@ public:
         return static_cast<T *>(_components.back().get());
     }
 
-    void add(Variable *variable) {
-        variable->next(_variables);
-        _variables = variable;
+    void add(Variable &variable) {
+        variable.next(_variables);
+        _variables = &variable;
     }
 
     void step(Frame &frame) {
@@ -63,17 +64,9 @@ public:
             }
         }
 
-        for (auto &n : _nodes) {
-            n->applyCorrection();
-        }
-
-        for (auto &c : _components) {
-            c->applyCorrection();
-        }
-
         for (auto variable = _variables; variable != nullptr;
              variable = variable->next()) {
-            variable->stepTime(frame.timeStep);
+            variable->applyCorrection(frame.timeStep);
         }
     }
 
@@ -88,24 +81,38 @@ public:
             }
         }
     }
+
+    void stepTime() {
+        for (auto variable = _variables; variable != nullptr;
+             variable = variable->next()) {
+            variable->stepTime();
+        }
+    }
 };
 
 void runSimulation(Circuit &circuit, double timeStep, double learningRate) {
-    for (size_t i = 0; i < 1000; ++i) {
-        dout << " ----------------- step " << i << " ----------------------\n";
-        auto frame = Frame{
-            .learningRate = learningRate,
-            .timeStep = timeStep,
-        };
-        circuit.step(frame);
+    for (int t = 0; t < 100; ++t) {
+        dout << " ================= time step " << t << " = " << t * timeStep
+             << "s ====================\n";
+        for (size_t i = 0; i < 1000; ++i) {
+            dout << " ----------------- step " << i
+                 << " ----------------------\n";
+            auto frame = Frame{
+                .learningRate = learningRate,
+                .timeStep = timeStep,
+            };
+            circuit.step(frame);
 
-        dout << "error: " << frame.error << "\t on " << frame.numParameters
-             << " parameters\n";
+            dout << "error: " << frame.error << "\t on " << frame.numParameters
+                 << " parameters\n";
 
-        if (frame.error < 0.0001) {
-            dout << "Stopped on iteration " << i
-                 << " since error was small enough (" << frame.error << ")\n";
-            break;
+            if (frame.error < 0.0001) {
+                dout << "Stopped on iteration " << i
+                     << " since error was small enough (" << frame.error
+                     << ")\n";
+                break;
+            }
         }
+        circuit.stepTime();
     }
 };

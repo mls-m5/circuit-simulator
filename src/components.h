@@ -1,5 +1,7 @@
 #pragma once
 
+#include "log.h"
+#include <functional>
 #include <iterator>
 #include <ostream>
 #include <span>
@@ -27,6 +29,7 @@ class Variable {
     double _correction = 0;
     double _integral =
         0; // Accummulated value, used for capacitors and inductors
+    double _previousIntegral = 0;
 
     Variable *_next = nullptr;
 
@@ -45,14 +48,15 @@ public:
         : _previous{defaultValue}
         , _currentValue{defaultValue} {}
 
-    constexpr void applyCorrection() {
+    constexpr void applyCorrection(double time) {
         _currentValue += _correction;
+        _integral = integral(time);
         _correction = 0;
     }
 
-    constexpr void stepTime(double time) {
+    constexpr void stepTime() {
         _previous = _currentValue;
-        _integral = integral(time);
+        _previousIntegral = _integral;
     }
 
     constexpr void operator+=(double value) {
@@ -76,7 +80,7 @@ public:
     }
 
     constexpr double integral(double time) const {
-        return _integral + (_currentValue + _previous) / 2. * time;
+        return _previousIntegral + (_currentValue + _previous) / 2. * time;
     }
 
     constexpr void incIntegral(double time, double value) {
@@ -208,9 +212,9 @@ public:
         _voltage.incDeriviative(time, value);
     }
 
-    constexpr void applyCorrection() {
-        _voltage.applyCorrection();
-    }
+    // constexpr void applyCorrection() {
+    //     _voltage.applyCorrection();
+    // }
 };
 
 class Component : public Steppable {
@@ -242,6 +246,10 @@ public:
     }
 
     ~Component() override = default;
+
+    void registerVariables(std::function<void(Variable &)> f) {
+        f(_current);
+    }
 
     double current(const Terminal &terminal) const {
         auto index = std::distance(_terminals.data(), &terminal);
@@ -297,9 +305,9 @@ public:
         _current += value * terminal(n).direction();
     }
 
-    virtual void applyCorrection() {
-        _current.applyCorrection();
-    }
+    // virtual void applyCorrection() {
+    //     _current.applyCorrection();
+    // }
 
     // multiplier should be timeStep for derivatives and 1/timestep for
     // integrals
@@ -315,6 +323,8 @@ public:
 
         terminal(0).incVoltage(-c);
         terminal(1).incVoltage(c);
+        dout << name() << ": when applying V: expected=" << expectedVoltage
+             << " error=" << error << " correction= " << c << "\n";
     }
 
     // multiplier should be timeStep for derivatives and 1/timestep for
@@ -324,6 +334,8 @@ public:
             correction(currentValue(0), expectedCurrent, frame.learningRate);
         frame.addError(error);
         incCurrent(0, c);
+        dout << name() << ": when applying I: expected=" << expectedCurrent
+             << " error=" << error << " correction= " << c << "\n";
     }
 };
 
