@@ -103,6 +103,7 @@ TEST_CASE("basic capacitor") {
     circuit.create<Battery>({0, 1})->voltage(1.5).name("B");
     auto &capacitor = circuit.create<Capacitor>({0, 1})->capacitance(10);
     capacitor.name("C");
+    auto &probe0 = circuit.create<VoltageProbe>({0})->name("V0");
     auto &probe1 = circuit.create<VoltageProbe>({1})->name("V1");
     circuit.create<Ground>({0});
 
@@ -111,9 +112,10 @@ TEST_CASE("basic capacitor") {
 
     dout.flush(3000);
 
+    EXPECT_NEAR(probe0.terminal(0).voltage().value(), 0., e);
     EXPECT_NEAR(probe1.terminal(0).voltage().value(), 1.5, e);
     EXPECT_NEAR(circuit.node(0)->current(), 0, e);
-    std::cout << capacitor.charge() << std::endl;
+    std::cout << capacitor.charge(timeStep) << std::endl;
 }
 
 TEST_SUIT_END

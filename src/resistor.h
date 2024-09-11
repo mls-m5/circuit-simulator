@@ -26,7 +26,7 @@ public:
             // frame.addError(error);
             // incCurrent(0, c);
             // dout << name() << " error " << error << "\n";
-            applyExpectedCurrent(frame, expectedCurrent, 1);
+            applyExpectedCurrent(frame, expectedCurrent);
             // dout << name() << " error " << error << "\n";
         }
 
@@ -43,7 +43,7 @@ public:
             // terminal(0).incVoltage(-c / 2.);
             // terminal(1).incVoltage(c / 2.);
 
-            applyExpectedVoltage(frame, expectedVoltageDrop, 1);
+            applyExpectedVoltage(frame, expectedVoltageDrop);
         }
     }
 

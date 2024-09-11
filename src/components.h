@@ -303,9 +303,7 @@ public:
 
     // multiplier should be timeStep for derivatives and 1/timestep for
     // integrals
-    void applyExpectedVoltage(Frame &frame,
-                              double expectedVoltage,
-                              double multiplier) {
+    void applyExpectedVoltage(Frame &frame, double expectedVoltage) {
         auto currentVoltage =
             terminal(1).voltage().value() - terminal(0).voltage().value();
 
@@ -315,19 +313,17 @@ public:
 
         c /= 2.;
 
-        terminal(0).incVoltage(-c * multiplier);
-        terminal(1).incVoltage(c * multiplier);
+        terminal(0).incVoltage(-c);
+        terminal(1).incVoltage(c);
     }
 
     // multiplier should be timeStep for derivatives and 1/timestep for
     // integrals
-    void applyExpectedCurrent(Frame &frame,
-                              double expectedCurrent,
-                              double multiplier) {
+    void applyExpectedCurrent(Frame &frame, double expectedCurrent) {
         auto [error, c] =
             correction(currentValue(0), expectedCurrent, frame.learningRate);
         frame.addError(error);
-        incCurrent(0, c * multiplier);
+        incCurrent(0, c);
     }
 };
 
